@@ -1,0 +1,598 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mcp-excalidraw-server",
+  "elements": [
+    {
+      "id": "zone",
+      "type": "rectangle",
+      "x": -60,
+      "y": -80,
+      "width": 2300,
+      "height": 900,
+      "backgroundColor": "#f8f9fa",
+      "strokeColor": "#adb5bd",
+      "text": "",
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "zone_title",
+      "type": "text",
+      "x": -40,
+      "y": -60,
+      "width": 600,
+      "height": 40,
+      "text": "SEARCH RECOVERY AGENT — Jornada do Usuário",
+      "fontSize": 24,
+      "fontFamily": 1,
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r1",
+      "type": "rectangle",
+      "x": 20,
+      "y": 300,
+      "width": 320,
+      "height": 90,
+      "backgroundColor": "#e9ecef",
+      "strokeColor": "#868e96",
+      "label": {
+        "text": "Pesquisa do produto\nna faixa de busca"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r2",
+      "type": "rectangle",
+      "x": 520,
+      "y": 300,
+      "width": 380,
+      "height": 90,
+      "backgroundColor": "#a5d8ff",
+      "strokeColor": "#1971c2",
+      "label": {
+        "text": "Agente de IA entra como chat:\n3+ produtos relevantes em <2s"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r3",
+      "type": "rectangle",
+      "x": 1100,
+      "y": 60,
+      "width": 320,
+      "height": 80,
+      "backgroundColor": "#e9ecef",
+      "strokeColor": "#868e96",
+      "label": {
+        "text": "Cliente comprou\numa das sugestões"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r4",
+      "type": "rectangle",
+      "x": 1600,
+      "y": 60,
+      "width": 300,
+      "height": 90,
+      "backgroundColor": "#b2f2bb",
+      "strokeColor": "#2f9e44",
+      "label": {
+        "text": "✅ SUCESSO\nConversão concluída"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r5",
+      "type": "rectangle",
+      "x": 1100,
+      "y": 290,
+      "width": 320,
+      "height": 80,
+      "backgroundColor": "#e9ecef",
+      "strokeColor": "#868e96",
+      "label": {
+        "text": "Cliente responde\nà pergunta"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r6",
+      "type": "rectangle",
+      "x": 1550,
+      "y": 290,
+      "width": 320,
+      "height": 80,
+      "backgroundColor": "#ffd8a8",
+      "strokeColor": "#e8590c",
+      "label": {
+        "text": "Agente responde:\n3+ produtos relevantes"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r7",
+      "type": "rectangle",
+      "x": 1550,
+      "y": 440,
+      "width": 320,
+      "height": 100,
+      "backgroundColor": "#ffd8a8",
+      "strokeColor": "#e8590c",
+      "label": {
+        "text": "+ 1 explicação do porquê\n+ 1 nova pergunta\n(LOOP ↺)"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r8",
+      "type": "rectangle",
+      "x": 1100,
+      "y": 540,
+      "width": 320,
+      "height": 80,
+      "backgroundColor": "#e9ecef",
+      "strokeColor": "#868e96",
+      "label": {
+        "text": "Não respondeu a nenhuma\npergunta nem adicionou"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.955Z",
+      "updatedAt": "2026-08-06T18:18:01.955Z",
+      "version": 1
+    },
+    {
+      "id": "r9",
+      "type": "rectangle",
+      "x": 1550,
+      "y": 540,
+      "width": 320,
+      "height": 80,
+      "backgroundColor": "#ffd8a8",
+      "strokeColor": "#e8590c",
+      "label": {
+        "text": "Esperar 30s e enviar\nmais uma pergunta (LOOP ↺)"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "r10",
+      "type": "rectangle",
+      "x": 1950,
+      "y": 540,
+      "width": 300,
+      "height": 90,
+      "backgroundColor": "#ffc9c9",
+      "strokeColor": "#e03131",
+      "label": {
+        "text": "❌ Não adicionou nada\nno carrinho"
+      },
+      "fontSize": 18,
+      "fontFamily": 1,
+      "roundness": {
+        "type": 3
+      },
+      "fillStyle": "solid",
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a1",
+      "type": "arrow",
+      "x": 348,
+      "y": 345,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#343a40",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          164,
+          0
+        ]
+      ],
+      "start": {
+        "id": "r1"
+      },
+      "end": {
+        "id": "r2"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a2",
+      "type": "arrow",
+      "x": 818.3281584033514,
+      "y": 296.74472943850714,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#2f9e44",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          344.56817298921555,
+          -153.48945887701424
+        ]
+      ],
+      "start": {
+        "id": "r2"
+      },
+      "end": {
+        "id": "r3"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a3",
+      "type": "arrow",
+      "x": 1427.9995835393943,
+      "y": 101.7142814646877,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#2f9e44",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          164.00083292121144,
+          1.6734778869511189
+        ]
+      ],
+      "start": {
+        "id": "r3"
+      },
+      "end": {
+        "id": "r4"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a4",
+      "type": "arrow",
+      "x": 907.997026452083,
+      "y": 339.60008109676136,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#e8590c",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          184.00594709583402,
+          -5.018344011704528
+        ]
+      ],
+      "start": {
+        "id": "r2"
+      },
+      "end": {
+        "id": "r5"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a5",
+      "type": "arrow",
+      "x": 1428,
+      "y": 330,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#e8590c",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          114,
+          0
+        ]
+      ],
+      "start": {
+        "id": "r5"
+      },
+      "end": {
+        "id": "r6"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a6",
+      "type": "arrow",
+      "x": 1710,
+      "y": 378,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#e8590c",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          54
+        ]
+      ],
+      "start": {
+        "id": "r6"
+      },
+      "end": {
+        "id": "r7"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a7",
+      "type": "arrow",
+      "x": 1561.8372824777668,
+      "y": 437.3199226587616,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#e8590c",
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -181.7995649555337,
+          -64.63984531752317
+        ]
+      ],
+      "start": {
+        "id": "r7"
+      },
+      "end": {
+        "id": "r5"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:20:08.427Z",
+      "version": 2
+    },
+    {
+      "id": "a8",
+      "type": "arrow",
+      "x": 822.6757639696524,
+      "y": 393.14328096885146,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#e03131",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          336.35059972026954,
+          143.71343806229703
+        ]
+      ],
+      "start": {
+        "id": "r2"
+      },
+      "end": {
+        "id": "r8"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a9",
+      "type": "arrow",
+      "x": 1428,
+      "y": 580,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#e03131",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          114,
+          0
+        ]
+      ],
+      "start": {
+        "id": "r8"
+      },
+      "end": {
+        "id": "r9"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "a10",
+      "type": "arrow",
+      "x": 1542,
+      "y": 580,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#e03131",
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -114,
+          0
+        ]
+      ],
+      "start": {
+        "id": "r9"
+      },
+      "end": {
+        "id": "r8"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:20:08.434Z",
+      "version": 2
+    },
+    {
+      "id": "a11",
+      "type": "arrow",
+      "x": 1877.9993426188412,
+      "y": 582.1538377258826,
+      "width": 100,
+      "height": 100,
+      "strokeColor": "#e03131",
+      "strokeStyle": "solid",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          64.00131476231763,
+          0.82052967644006
+        ]
+      ],
+      "start": {
+        "id": "r9"
+      },
+      "end": {
+        "id": "r10"
+      },
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:18:01.956Z",
+      "version": 1
+    },
+    {
+      "id": "note1",
+      "type": "text",
+      "x": 520,
+      "y": 430,
+      "width": 420,
+      "height": 40,
+      "text": "⚙ Configuração do lojista:\n1 pergunta ou 3 respostas pré-definidas\n(opção de escrita manual)",
+      "fontSize": 15,
+      "fontFamily": 1,
+      "createdAt": "2026-08-06T18:18:01.956Z",
+      "updatedAt": "2026-08-06T18:20:08.418Z",
+      "version": 2
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  }
+}
