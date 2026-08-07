@@ -1,6 +1,12 @@
 import { withRuntime } from "@decocms/runtime";
 import { prompts } from "./prompts/index.ts";
 import { helloAppResource } from "./resources/hello.ts";
+import {
+	analyzeAppResource,
+	converseAppResource,
+	reengageAppResource,
+	searchRecoveryAppResource,
+} from "./resources/searchRecovery.ts";
 import { tools } from "./tools/index.ts";
 import { type Env, StateSchema } from "./types/env.ts";
 
@@ -101,7 +107,13 @@ const runtime = withRuntime<Env, typeof StateSchema>({
 	},
 	tools,
 	prompts,
-	resources: [helloAppResource],
+	resources: [
+		helloAppResource,
+		searchRecoveryAppResource,
+		converseAppResource,
+		reengageAppResource,
+		analyzeAppResource,
+	],
 });
 
 /** Platform-agnostic fetch handler. Use this in platform entrypoints. */
