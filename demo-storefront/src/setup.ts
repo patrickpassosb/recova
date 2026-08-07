@@ -158,6 +158,11 @@ registerInvokeHandlers({
     (await import("./loaders/searchSuggestions")).default(props as any),
   "site/loaders/searchSuggestions": async (props) =>
     (await import("./loaders/searchSuggestions")).default(props as any),
+  // Search Recovery Agent — proxy para o MCP server do agente (VPS).
+  "site/loaders/searchRecovery.ts": async (props) =>
+    (await import("./loaders/searchRecovery")).default(props as any),
+  "site/loaders/searchRecovery": async (props) =>
+    (await import("./loaders/searchRecovery")).default(props as any),
   "site/actions/wishlist/submit.ts": async (props, req) =>
     (await import("./actions/wishlist/submit")).default(props, req),
   "site/actions/wishlist/submit": async (props, req) =>

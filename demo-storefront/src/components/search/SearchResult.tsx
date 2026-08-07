@@ -1,7 +1,7 @@
 import type { ProductListingPage } from "@decocms/apps-commerce/types";
 import { BreadcrumbJsonLd, PLPJsonLd } from "@decocms/blocks/hooks";
 import { mapProductToAnalyticsItem } from "@decocms/apps-commerce/utils/productToAnalyticsItem";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { useOffer } from "@decocms/apps-commerce/sdk/useOffer";
 import { useRouterState } from "@tanstack/react-router";
 import { useSendEvent } from "../../sdk/useSendEvent";
@@ -10,6 +10,7 @@ import Breadcrumb from "../ui/Breadcrumb";
 import Filters from "./Filters";
 import SearchFilterDrawer from "./SearchFilterDrawer";
 import SearchPagination, { rebasePaginationHrefs } from "./SearchPagination";
+import SearchRecoveryOverlay from "./SearchRecoveryOverlay";
 import SearchResultGrid from "./SearchResultGrid";
 import SearchResultGridSkeleton from "./SearchResultGridSkeleton";
 import SearchSortBar from "./SearchSortBar";
@@ -59,6 +60,8 @@ function Result({
   url,
 }: SectionProps<typeof loader> & { page: ProductListingPage }) {
   const filterDrawerId = useId();
+  // Termo da busca atual (para o agente de recuperação em zero results)
+  const [recoveryTerm, setRecoveryTerm] = useState<string | null>(null);
 
   // Use the live URL for filter/sort/pagination link rebasing. The section
   // loader's `url` is the SSR URL — on client navigation the page re-renders
@@ -74,6 +77,13 @@ function Result({
   const zeroIndexedOffsetPage = pageInfo.currentPage - startingPage;
   const offset = zeroIndexedOffsetPage * perPage;
   const { prev, next } = rebasePaginationHrefs(pageInfo.previousPage, pageInfo.nextPage, href);
+
+  // Zero resultados → agente de recuperação entra automaticamente
+  const searchTerm = new URL(href, "http://local").searchParams.get("q");
+  const isZeroResults = products.length === 0 && Boolean(searchTerm);
+  if (isZeroResults && recoveryTerm !== searchTerm) {
+    setRecoveryTerm(searchTerm);
+  }
 
   const viewItemListEvent = useSendEvent({
     on: "view",
@@ -96,6 +106,12 @@ function Result({
 
   return (
     <div {...viewItemListEvent} className="w-full">
+      {recoveryTerm && (
+        <SearchRecoveryOverlay
+          term={recoveryTerm}
+          onClose={() => setRecoveryTerm(null)}
+        />
+      )}
       <div className="container flex w-full flex-col gap-5 px-3 py-4 sm:gap-8 sm:py-6">
         {/* SEO: schema.org JSON-LD, server-rendered inline (crawlers read it anywhere in the document) */}
         <PLPJsonLd page={page} />

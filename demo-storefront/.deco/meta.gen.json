@@ -136,16 +136,20 @@
           "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3Byb2R1Y3RCeUhhbmRsZS50cw==",
           "namespace": "site"
         },
+        "site/loaders/searchRecovery.ts": {
+          "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3NlYXJjaFJlY292ZXJ5LnRz",
+          "namespace": "site"
+        },
+        "site/loaders/searchSuggestions.ts": {
+          "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3NlYXJjaFN1Z2dlc3Rpb25zLnRz",
+          "namespace": "site"
+        },
         "site/loaders/user.ts": {
           "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3VzZXIudHM=",
           "namespace": "site"
         },
         "site/loaders/wishlist.ts": {
           "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3dpc2hsaXN0LnRz",
-          "namespace": "site"
-        },
-        "site/loaders/searchSuggestions.ts": {
-          "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3NlYXJjaFN1Z2dlc3Rpb25zLnRz",
           "namespace": "site"
         },
         "shopify/loaders/ProductDetailsPage.ts": {
@@ -275,6 +279,80 @@
           }
         }
       },
+      "c2l0ZS9sb2FkZXJzL3NlYXJjaFJlY292ZXJ5LnRz": {
+        "title": "site/loaders/searchRecovery.ts",
+        "type": "object",
+        "required": [
+          "__resolveType"
+        ],
+        "properties": {
+          "__resolveType": {
+            "type": "string",
+            "enum": [
+              "site/loaders/searchRecovery.ts"
+            ],
+            "default": "site/loaders/searchRecovery.ts"
+          },
+          "query": {
+            "type": "string",
+            "nullable": true,
+            "description": "Termo digitado na busca",
+            "title": "Query"
+          },
+          "session_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "ID de sessão para continuar a conversa",
+            "title": "Session_id"
+          },
+          "user_response": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resposta do cliente (para converse)",
+            "title": "User_response"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "search_recovery",
+              "converse",
+              "reengage",
+              "analyze"
+            ],
+            "nullable": true,
+            "description": "Ação: search_recovery | converse | reengage | analyze",
+            "title": "Action"
+          }
+        }
+      },
+      "c2l0ZS9sb2FkZXJzL3NlYXJjaFN1Z2dlc3Rpb25zLnRz": {
+        "title": "site/loaders/searchSuggestions.ts",
+        "type": "object",
+        "required": [
+          "__resolveType"
+        ],
+        "properties": {
+          "__resolveType": {
+            "type": "string",
+            "enum": [
+              "site/loaders/searchSuggestions.ts"
+            ],
+            "default": "site/loaders/searchSuggestions.ts"
+          },
+          "query": {
+            "type": "string",
+            "nullable": true,
+            "description": "Term typed in the searchbar",
+            "title": "Query"
+          },
+          "count": {
+            "type": "number",
+            "nullable": true,
+            "description": "How many products to suggest",
+            "title": "Count"
+          }
+        }
+      },
       "c2l0ZS9sb2FkZXJzL3VzZXIudHM=": {
         "title": "site/loaders/user.ts",
         "type": "object",
@@ -304,34 +382,6 @@
               "site/loaders/wishlist.ts"
             ],
             "default": "site/loaders/wishlist.ts"
-          }
-        }
-      },
-      "c2l0ZS9sb2FkZXJzL3NlYXJjaFN1Z2dlc3Rpb25zLnRz": {
-        "title": "site/loaders/searchSuggestions.ts",
-        "type": "object",
-        "required": [
-          "__resolveType"
-        ],
-        "properties": {
-          "__resolveType": {
-            "type": "string",
-            "enum": [
-              "site/loaders/searchSuggestions.ts"
-            ],
-            "default": "site/loaders/searchSuggestions.ts"
-          },
-          "query": {
-            "type": "string",
-            "nullable": true,
-            "description": "Term typed in the searchbar",
-            "title": "Query"
-          },
-          "count": {
-            "type": "number",
-            "nullable": true,
-            "description": "How many products to suggest",
-            "title": "Count"
           }
         }
       },
@@ -1571,6 +1621,57 @@
       "c3JjL3NlY3Rpb25zL0Zvb3Rlci9Gb290ZXIudHN4@Props": {
         "type": "object",
         "properties": {
+          "support": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "nullable": true,
+                "description": "Título do bloco de atendimento",
+                "title": "Title"
+              },
+              "description": {
+                "type": "string",
+                "nullable": true,
+                "description": "Horário de atendimento e prazo de resposta",
+                "title": "Description"
+              },
+              "channels": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "description": "Ex.: Telefone, E-mail, WhatsApp",
+                      "title": "Label"
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "Valor exibido. Ex.: 0800 000 0000, sac@loja.com.br",
+                      "title": "Value"
+                    },
+                    "href": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Link opcional. Ex.: tel:08000000000, mailto:sac@loja.com.br",
+                      "title": "Href"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "value"
+                  ],
+                  "titleBy": "label"
+                },
+                "nullable": true,
+                "title": "Channels"
+              }
+            },
+            "nullable": true,
+            "description": "Canais de atendimento (SAC) exibidos no rodapé",
+            "title": "Support"
+          },
           "links": {
             "type": "array",
             "items": {
@@ -5639,13 +5740,16 @@
             "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3Byb2R1Y3RCeUhhbmRsZS50cw=="
           },
           {
+            "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3NlYXJjaFJlY292ZXJ5LnRz"
+          },
+          {
+            "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3NlYXJjaFN1Z2dlc3Rpb25zLnRz"
+          },
+          {
             "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3VzZXIudHM="
           },
           {
             "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3dpc2hsaXN0LnRz"
-          },
-          {
-            "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3NlYXJjaFN1Z2dlc3Rpb25zLnRz"
           },
           {
             "$ref": "#/definitions/c2hvcGlmeS9sb2FkZXJzL1Byb2R1Y3REZXRhaWxzUGFnZS50cw=="

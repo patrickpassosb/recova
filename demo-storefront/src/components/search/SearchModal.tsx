@@ -16,6 +16,7 @@ import { relative } from "~/sdk/url";
 import Icon from "../ui/Icon";
 import Image from "../ui/Image";
 import { invoke } from "../../runtime";
+import SearchRecoveryOverlay from "./SearchRecoveryOverlay";
 
 // Where the form navigates on submit, and the querystring param it uses.
 export const ACTION = "/s";
@@ -138,6 +139,7 @@ export default function SearchModal({
   const [term, setTerm] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
+  const [recoveryTerm, setRecoveryTerm] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -218,7 +220,6 @@ export default function SearchModal({
       setLoading(false);
       return;
     }
-
     let cancelled = false;
     setLoading(true);
     const timer = setTimeout(async () => {
@@ -228,6 +229,10 @@ export default function SearchModal({
           count: SUGGESTION_COUNT,
         })) as { products?: Product[] } | null;
         if (!cancelled) setProducts(result?.products ?? []);
+        // Zero resultados (ou baixa relevância) → agente de recuperação entra
+        if (!cancelled && (result?.products?.length ?? 0) === 0) {
+          setRecoveryTerm(query);
+        }
       } catch {
         if (!cancelled) setProducts([]);
       } finally {
@@ -359,6 +364,12 @@ export default function SearchModal({
       )}
 
       {overlay && createPortal(overlay, document.body)}
+      {recoveryTerm && (
+        <SearchRecoveryOverlay
+          term={recoveryTerm}
+          onClose={() => setRecoveryTerm(null)}
+        />
+      )}
     </>
   );
 }
