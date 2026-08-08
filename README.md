@@ -1,13 +1,15 @@
-# Search Recovery Agent
+# Recova
+
+**A segunda chance da sua busca.**
 
 **Hackathon Agents for Commerce — Deco (2026)**
 
-Agente de IA que recupera vendas quando a busca nativa da loja falha. Em vez de uma página de "nenhum resultado encontrado", o agente entra como chat, mostra produtos relevantes em menos de 2 segundos e guia o cliente até a compra.
+A Recova é uma camada de IA para e-commerce que é acionada quando a busca da loja não encontra ou não entende o que o cliente procura. Ela conversa, mostra alternativas e ajuda a recuperar a venda — sem substituir a busca que você já usa.
 
 ## O problema
 
-- **12–15%** das buscas em lojas online retornam zero resultados (LATAM lidera por regionalismos)
-- Quando o cliente encontra zero resultados, **a conversão cai 87%** e **12% dos compradores vão ao concorrente**
+- **10–20%** das buscas internas em e-commerce retornam zero resultados (LATAM lidera por regionalismos)
+- Quando o cliente encontra zero resultados, **a conversão cai 50–87%** e **12% dos compradores vão ao concorrente**
 - **63% dos lojistas estão insatisfeitos** com a busca nativa da plataforma
 - Usuários de busca **convertem 3–5x mais** que navegadores — é o canal de maior intenção de compra, e ele está vazando
 
@@ -18,7 +20,7 @@ Camada fina de IA que atua **sobre** a busca nativa (não substitui):
 ```
 Pesquisa do produto → busca falha (zero results / baixa relevância)
     ↓
-Agente de IA entra como chat: 3+ produtos relevantes em <2s
+Recova entra como chat: 3+ produtos relevantes em <2s
     ├── Cliente comprou → ✅ SUCESSO (verde)
     ├── Cliente respondeu → 3+ produtos + explicação + nova pergunta (loop)
     └── Não respondeu em 30s → nova pergunta (reengajamento) → ❌ sem conversão (vermelho)
@@ -32,12 +34,12 @@ Agente de IA entra como chat: 3+ produtos relevantes em <2s
 | Alhena | Busca conversacional full-page (substitui a experiência) | Não é camada de recuperação |
 | Doofinder, Klevu, Searchspring | Apps de busca (SMB/mid) | Trocar ≠ consertar |
 | VTEX IS, Shopify S&D | Busca nativa (grátis) | Não conversam, não recuperam |
-| **Nós** | **Search Recovery: entra SÓ quando falha, com loop de reengajamento** | **Ninguém faz isso como produto** |
+| **Recova** | **Entra SÓ quando a busca falha, com loop de reengajamento** | **Ninguém faz isso como produto** |
 
 ## Estrutura do repo
 
 ```
-search-recovery-agent/
+recova/
 ├── mcp-app/             # O AGENTE — tools MCP (search_recovery, converse, reengage, analyze_zero_results)
 ├── demo-storefront/     # O AMBIENTE DE DEMO — overlay conversacional na busca
 └── docs/
@@ -54,59 +56,17 @@ search-recovery-agent/
 
 ## Como rodar
 
-> ⚠️ O overlay do storefront depende do MCP server rodando na mesma máquina
-> (o loader proxy chama `http://localhost:3001/api/mcp`). Suba o mcp-app
-> primeiro.
-
 ```bash
-# 1) MCP App (o agente) — servidor MCP em http://localhost:3001/api/mcp
+# MCP App (o agente)
 cd mcp-app
 bun install
-bun run dev:api        # só o servidor MCP (recomendado para testar as tools)
-# ou: bun run dev      # servidor + build da UI (Vite)
+bun run dev          # servidor MCP em http://localhost:3001/api/mcp
 
-# 2) Demo storefront (o ambiente) — overlay conversacional na busca
+# Demo storefront (o ambiente)
 cd demo-storefront
 bun install
-bun run dev            # storefront em http://localhost:5173
+bun run dev          # storefront com overlay conversacional
 ```
-
-### Testar o agente
-
-```bash
-# Listar as 4 tools MCP
-curl -X POST http://localhost:3001/api/mcp \
-  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-
-# T1 — search_recovery (3+ produtos em <2s)
-curl -X POST http://localhost:3001/api/mcp \
-  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_recovery","arguments":{"query":"tênis de corrida até 300"}}}'
-
-# T2 — converse (loop com contexto) / T3 — reengage (máx 2) / T4 — analyze_zero_results
-# (use o session_id retornado pelo search_recovery)
-```
-
-### Testar o overlay no storefront
-
-Abra `http://localhost:5173/s?q=<termo-sem-resultado>` (ex.: `?q=xyzabc`) — o
-agente entra automaticamente como chat com 3+ produtos. Responda no chat para
-ver o loop, clique em **Comprar** para o estado ✅ verde, ou não faça nada por
-30s (2x) para ver o reengajamento e o estado ❌ vermelho.
-
-## Verificação (comandos que passaram)
-
-| Critério | Comando | Resultado |
-|---|---|---|
-| 4 tools no MCP | `tools/list` | `search_recovery`, `converse`, `reengage`, `analyze_zero_results` |
-| T1 <2s, 3+ produtos ≤R$300 | `time curl` + `search_recovery("tênis de corrida até 300")` | 0.9s, 3 produtos (High Top Canvas Shoes R$40, Sublimation Flip Flops R$10, Women's Slides R$25) |
-| T2 contexto | `converse` 2+ iterações | sessão mantida, produtos relevantes a cada resposta |
-| T3 máx 2 | `reengage` 3x | tentativa 1 → 2 → exhausted |
-| T4 relatório | `analyze_zero_results` | top 10 termos com causa (typo/sinônimo/não catalogado/regionalismo) |
-| Storefront sobe | `bun run dev` | Vite :5173, HTTP 200 |
-| Overlay zero-results | `/s?q=xyzabc` | abre automaticamente com chat do agente |
-| Estados | Comprar / timeout 30s×2 | ✅ verde / ❌ vermelho |
 
 ## Métricas do MVP
 
@@ -117,6 +77,14 @@ ver o loop, clique em **Comprar** para o estado ✅ verde, ou não faça nada po
 | Zero-results recovery | 0% | 30%+ |
 | Recovery após timeout 30s | 0% | 5%+ |
 | Custo por conversa | N/A | <R$0.05 |
+
+## Branding
+
+- **Nome:** Recova (marca proprietária, sem tradução)
+- **Tagline:** "A segunda chance da sua busca"
+- **Cores:** Azul Recova `#155EEF`, Azul Profundo `#102A43`, Laranja Resgate `#F97316`, Verde `#16A34A`
+- **Tipografia:** Manrope (display) + Inter (corpo)
+- **Brand book completo:** `docs/brand_book.md` (no vault do time)
 
 ## Ferramentas usadas
 
