@@ -135,7 +135,7 @@ export default function SearchRecoveryOverlay({
       { role: "user", text: `Quero comprar: ${product.title}` },
       {
         role: "agent",
-        text: `Ótima escolha! 🎉 Adicionei ${product.title} (${formatPrice(product.price)}) ao carrinho.`,
+        text: `Ótima escolha! Adicionei ${product.title} (${formatPrice(product.price)}) ao carrinho.`,
       },
     ]);
     setFlow({ status: "success" });
@@ -169,7 +169,7 @@ export default function SearchRecoveryOverlay({
     if (!result) {
       setMessages((prev) => [
         ...prev,
-        { role: "agent", text: "Desculpe, não consegui processar agora. Pode repetir?" },
+        { role: "agent", text: "Não consegui encontrar uma opção confiável agora. Você pode tentar outra busca." },
       ]);
       scheduleReengage();
       return;
@@ -206,30 +206,37 @@ export default function SearchRecoveryOverlay({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Assistente de busca"
+        aria-label="Recova — assistente de busca"
         className={`relative mx-3 mb-3 flex w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:mb-0 ${
-          isSuccess ? "ring-2 ring-green-500" : isFailed ? "ring-2 ring-red-500" : ""
+          isSuccess ? "ring-2 ring-[#16A34A]" : isFailed ? "ring-2 ring-red-500" : ""
         }`}
       >
         {/* Header */}
         <div
           className={`flex items-center justify-between px-4 py-3 text-white ${
-            isSuccess ? "bg-green-600" : isFailed ? "bg-red-600" : "bg-ink"
+            isSuccess ? "bg-[#16A34A]" : isFailed ? "bg-red-600" : "bg-[#102A43]"
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className="text-lg">{isSuccess ? "✅" : isFailed ? "❌" : "🤖"}</span>
+            <span className="flex size-8 items-center justify-center rounded-lg bg-[#155EEF]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 12c0-4.4 3.6-8 8-8 2.2 0 4.2 0.9 5.7 2.3" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+                <path d="M20 12c0 4.4-3.6 8-8 8-2.2 0-4.2-0.9-5.7-2.3" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+                <path d="M12 4v8l4 4" stroke="#F97316" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="2" fill="#F97316" />
+              </svg>
+            </span>
             <div>
-              <p className="text-sm font-semibold">
+              <p className="font-manrope text-sm font-bold">
                 {isSuccess
                   ? "Compra concluída!"
                   : isFailed
                     ? "Sem conversão"
-                    : "Assistente de busca"}
+                    : "Recova"}
               </p>
               <p className="text-2xs opacity-80">
                 {isSuccess
-                  ? "Venda recuperada pelo agente"
+                  ? "Venda recuperada pela Recova"
                   : isFailed
                     ? "Cliente não adicionou nada ao carrinho"
                     : `Recuperando resultados para "${term}"`}
@@ -247,7 +254,7 @@ export default function SearchRecoveryOverlay({
         </div>
 
         {/* Corpo */}
-        <div className="flex max-h-[50vh] min-h-40 flex-col gap-3 overflow-y-auto bg-gray-50 p-4">
+        <div className="flex max-h-[50vh] min-h-40 flex-col gap-3 overflow-y-auto bg-[#F4F7FA] p-4">
           {flow.status === "loading" && (
             <div className="flex items-center gap-2 text-sm text-muted">
               <span className="loading loading-spinner loading-xs" />
@@ -263,8 +270,8 @@ export default function SearchRecoveryOverlay({
               <div
                 className={`max-w-[85%] whitespace-pre-line rounded-lg px-3 py-2 text-sm ${
                   msg.role === "user"
-                    ? "bg-ink text-white"
-                    : "bg-white text-ink shadow-sm"
+                    ? "bg-[#102A43] text-white"
+                    : "bg-white text-[#1D2939] shadow-sm"
                 }`}
               >
                 {msg.text}
@@ -294,7 +301,7 @@ export default function SearchRecoveryOverlay({
                         type="button"
                         onClick={() => handleBuy(p)}
                         disabled={isSuccess || isFailed}
-                        className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-40"
+                        className="rounded-md bg-[#155EEF] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#155EEF]/80 disabled:opacity-40"
                       >
                         Comprar
                       </button>
@@ -313,8 +320,8 @@ export default function SearchRecoveryOverlay({
           )}
 
           {isSuccess && (
-            <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
-              🎉 Obrigado! Sua compra foi registrada. O agente recuperou uma venda
+            <div className="rounded-lg bg-[#16A34A]/10 p-3 text-sm text-[#16A34A]">
+              Obrigado! Sua compra foi registrada. A Recova recuperou uma venda
               que a busca nativa teria perdido.
             </div>
           )}
@@ -341,13 +348,13 @@ export default function SearchRecoveryOverlay({
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
               placeholder="Responda ao assistente..."
-              className="grow rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-ink"
+              className="grow rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#155EEF]"
               disabled={thinking || flow.status === "loading"}
             />
             <button
               type="submit"
               disabled={thinking || flow.status === "loading" || !input.trim()}
-              className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink/80 disabled:opacity-40"
+              className="rounded-md bg-[#155EEF] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#155EEF]/80 disabled:opacity-40"
             >
               Enviar
             </button>
