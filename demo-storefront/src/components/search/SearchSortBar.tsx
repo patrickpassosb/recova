@@ -19,7 +19,7 @@ export default function SearchSortBar({
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-xs text-muted">
-        {recordPerPage} of {totalRecords} results
+        {totalRecords} {totalRecords === 1 ? "resultado" : "resultados"}
       </span>
 
       <div className="flex items-center gap-2">

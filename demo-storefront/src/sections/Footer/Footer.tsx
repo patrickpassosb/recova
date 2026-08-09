@@ -146,7 +146,6 @@ function Footer({
           </div>
 
           <div className="flex flex-nowrap items-center justify-center gap-4">
-            <span className="text-sm text-muted">Powered by</span>
             <PoweredByDeco />
           </div>
         </div>

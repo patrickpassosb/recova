@@ -231,21 +231,21 @@ function ProductCarousel({
                 {url ? (
                   <a
                     href={url}
-                    className="block truncate text-sm font-medium hover:underline"
+                    className="block text-sm font-medium leading-snug hover:underline line-clamp-2"
                     style={{ color: theme.colors.text }}
                   >
                     {p.title}
                   </a>
                 ) : (
-                  <p className="truncate text-sm font-medium" style={{ color: theme.colors.text }}>
+                  <p className="line-clamp-2 text-sm font-medium leading-snug" style={{ color: theme.colors.text }}>
                     {p.title}
                   </p>
                 )}
-                <p className="text-xs" style={{ color: theme.colors.muted }}>
+                <p className="mt-0.5 text-xs font-semibold" style={{ color: theme.colors.primary }}>
                   {formatPrice(p.price)}
                 </p>
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1.5">
                 <button
                   type="button"
                   onClick={() => onAddToCart(p, true)}
@@ -263,6 +263,7 @@ function ProductCarousel({
                   style={{
                     borderColor: theme.colors.primary,
                     color: theme.colors.primary,
+                    backgroundColor: "transparent",
                   }}
                 >
                   {theme.copy.addToCart}
@@ -613,6 +614,25 @@ export default function SearchRecoveryOverlay({
           </div>
         )}
 
+        {/* Mensagem explícita de zero resultados — o agente entrou porque a busca nativa não achou nada */}
+        {flow.status === "chat" && (
+          <div
+            className="rounded-lg border p-3 text-sm"
+            style={{
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.cardBg,
+              color: theme.colors.text,
+            }}
+          >
+            <p className="font-semibold" style={{ color: theme.colors.primary }}>
+              Nenhum resultado exato para "{term}"
+            </p>
+            <p className="mt-1" style={{ color: theme.colors.muted }}>
+              Mas encontrei alternativas que podem servir. Veja abaixo e refine com os chips.
+            </p>
+          </div>
+        )}
+
         {messages.map((msg, i) => (
           <div
             key={i}
@@ -679,10 +699,11 @@ export default function SearchRecoveryOverlay({
                     type="button"
                     onClick={() => handleSend(chip)}
                     disabled={thinking}
-                    className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
+                    className="rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-40"
                     style={{
-                      backgroundColor: theme.colors.primary,
-                      color: "#FFFFFF",
+                      borderColor: theme.colors.primary,
+                      color: theme.colors.primary,
+                      backgroundColor: "transparent",
                     }}
                   >
                     {chip}

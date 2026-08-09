@@ -317,11 +317,20 @@
               "search_recovery",
               "converse",
               "reengage",
-              "analyze"
+              "analyze",
+              "dashboard",
+              "track_event"
             ],
             "nullable": true,
-            "description": "Ação: search_recovery | converse | reengage | analyze",
+            "description": "Ação: search_recovery | converse | reengage | analyze | dashboard | track_event",
             "title": "Action"
+          },
+          "event": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true,
+            "description": "Payload do evento (para track_event)",
+            "title": "Event"
           }
         }
       },

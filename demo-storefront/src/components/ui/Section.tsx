@@ -21,7 +21,7 @@ function Header({ title, cta }: Props) {
       <h2 className="text-display font-medium text-ink">{title}</h2>
       {cta && (
         <a
-          className="tap-scale flex items-center gap-1 text-sm text-ink-soft transition-colors duration-(--duration-fast) hover:text-ink"
+          className="tap-scale flex items-center gap-1 text-sm font-semibold text-primary transition-colors duration-(--duration-fast) hover:opacity-80"
           href={cta}
         >
           See all

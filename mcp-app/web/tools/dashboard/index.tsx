@@ -82,9 +82,9 @@ export default function DashboardPage() {
 		<div className="min-h-dvh p-6">
 			<div className="mx-auto max-w-4xl space-y-4">
 				<Card>
-					<CardHeader>
-						<CardTitle className="text-lg">📊 Dashboard Recova</CardTitle>
-						<p className="text-sm text-muted-foreground">
+					<CardHeader className="bg-[#102A43] text-white rounded-t-xl">
+						<CardTitle className="text-lg text-white">📊 Dashboard Recova</CardTitle>
+						<p className="text-sm text-slate-300">
 							100% dados reais de instrumentação — sem seed, sem badge.
 						</p>
 					</CardHeader>
@@ -126,19 +126,22 @@ export default function DashboardPage() {
 										</tr>
 									</thead>
 									<tbody>
-										{result.recent.map((e, i) => (
-											<tr key={i} className="border-b last:border-0">
-												<td className="p-2">
-													<Badge variant="secondary">{String(e.event)}</Badge>
-												</td>
-												<td className="p-2 text-muted-foreground">
-													{new Date(String(e.timestamp)).toLocaleString("pt-BR")}
-												</td>
-												<td className="p-2 text-muted-foreground">
-													{String(e.session_id ?? "-").slice(0, 8)}
-												</td>
-											</tr>
-										))}
+										{result.recent.map((e, i) => {
+											const ts = new Date(String(e.timestamp));
+											const ago = Math.max(0, Math.round((Date.now() - ts.getTime()) / 1000));
+											const when = ago < 60 ? `${ago}s atrás` : ago < 3600 ? `${Math.round(ago / 60)}min atrás` : ts.toLocaleString("pt-BR");
+											return (
+												<tr key={i} className="border-b last:border-0">
+													<td className="p-2">
+														<Badge variant="secondary">{String(e.event)}</Badge>
+													</td>
+													<td className="p-2 text-muted-foreground">{when}</td>
+													<td className="p-2 text-muted-foreground">
+														{String(e.session_id ?? "-").slice(0, 8)}
+													</td>
+												</tr>
+											);
+										})}
 									</tbody>
 								</table>
 							</div>

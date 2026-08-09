@@ -175,6 +175,15 @@ function HeroSlide({ image, mobileImage, href = "/", headline, logo, logoAlt, is
             {...(isLcp ? { fetchpriority: "high" } : {})}
           />
         </Picture>
+        {/* Overlay de cor do brand book — força a paleta Recova sobre imagens externas */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#102A43]/95 via-[#155EEF]/70 to-[#102A43]/90" />
+        {headline && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="max-w-2xl px-6 text-center font-display text-3xl font-bold text-white drop-shadow-lg sm:text-5xl">
+              {headline}
+            </span>
+          </div>
+        )}
       </Link>
 
       {logo && (

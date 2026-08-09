@@ -4,6 +4,7 @@ import { helloAppResource } from "./resources/hello.ts";
 import {
 	analyzeAppResource,
 	converseAppResource,
+	dashboardAppResource,
 	reengageAppResource,
 	searchRecoveryAppResource,
 } from "./resources/searchRecovery.ts";
@@ -113,6 +114,7 @@ const runtime = withRuntime<Env, typeof StateSchema>({
 		converseAppResource,
 		reengageAppResource,
 		analyzeAppResource,
+		dashboardAppResource,
 	],
 });
 

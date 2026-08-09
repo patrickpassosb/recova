@@ -95,8 +95,8 @@ export const recovaDefaultTheme: RecovaTheme = {
   copy: {
     agentIntro: "Entendi.",
     buySuccess: "Ótima escolha! Adicionei {product} ({price}) ao carrinho.",
-    buySuccessTitle: "Compra concluída!",
-    buySuccessSubtitle: "Adicionado ao carrinho",
+    buySuccessTitle: "Adicionado ao carrinho!",
+    buySuccessSubtitle: "Continue navegando ou finalize a compra",
     failedTitle: "Sem conversão",
     failedSubtitle: "Cliente não adicionou nada ao carrinho",
     failedBody:

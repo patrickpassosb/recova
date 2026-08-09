@@ -2,7 +2,7 @@
   "name": "Home Page",
   "sections": [
     {
-      "__resolveType": "Deco"
+      "__resolveType": "Recova"
     },
     {
       "__resolveType": "Header"
@@ -120,20 +120,6 @@
           }
         }
       ]
-    },
-    {
-      "__resolveType": "site/sections/Images/Banner.tsx",
-      "title": "Capybara Helper",
-      "cta": {
-        "label": "Shop now",
-        "href": "/s?q=jeans"
-      },
-      "price": "79,99",
-      "priceLabel": "Starting at",
-      "images": {
-        "desktop": "https://decoims.com/demo-storefront/2026/07/161c9ecb-ceea-4562-bc55-01a2967dc4f2-banner4.png",
-        "mobile": "https://decoims.com/demo-storefront/2026/07/fdcd0e46-2eb0-4d3f-9de2-ec8b7d6b8fc0-banner4-mob.png"
-      }
     },
     {
       "__resolveType": "website/sections/Rendering/Lazy.tsx",

@@ -7,7 +7,7 @@ export type ButtonSize = "sm" | "md";
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
   glass: "frost text-ink hover:bg-glass-strong",
-  solid: "bg-ink text-white hover:bg-ink-soft",
+  solid: "bg-primary text-white hover:opacity-90",
   outline: "bg-transparent text-ink border border-gray-300 hover:border-ink",
 };
 
