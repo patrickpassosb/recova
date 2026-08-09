@@ -15,6 +15,7 @@ import { z } from "zod";
 import type { Env } from "../types/env.ts";
 import { chat, extractJson, LlmError } from "../lib/llm.ts";
 import {
+  deriveCatalogCategories,
   extractMaxPrice,
   fetchCatalog,
   isStopword,
@@ -22,6 +23,7 @@ import {
   normalize,
   popularProducts,
   toProductOutput,
+  type CatalogCategory,
   type CatalogProduct,
   type ScoredProduct,
 } from "../lib/shopify.ts";
@@ -68,6 +70,10 @@ export const searchRecoveryOutputSchema = z.object({
     .describe("3+ produtos relevantes do catálogo (nunca inventados)"),
   explanation: z.string().describe("Explicação do porquê estes produtos foram escolhidos"),
   follow_up_question: z.string().describe("Pergunta de refinamento para o cliente"),
+  refinement_options: z
+    .array(z.string())
+    .optional()
+    .describe("2-4 opções de refinamento (chips) relevantes à query — ex.: ['Casual', 'Esportivo', 'Dia a dia']"),
 });
 
 export type SearchRecoveryOutput = z.infer<typeof searchRecoveryOutputSchema>;
@@ -78,17 +84,23 @@ interface Intent {
   max_price: number | null;
 }
 
-const INTENT_SYSTEM_PROMPT = [
-  "Você é o motor de entendimento de intenção de busca de uma loja de e-commerce.",
-  "O catálogo da loja tem estes tipos de produto: sticker, t-shirt, tee, hoodie, sweatshirt, raglan hoodie, bomber jacket, rain jacket, mug, tumbler, bottle, water bottle, backpack, tote bag, hat, bucket hat, winter hat, notebook, pen, pillow, snap case, flip flops, slides, canvas shoes, sneakers, shorts.",
-  "Receba a query do cliente (em português, pode ter typos e regionalismos) e responda APENAS com JSON:",
-  '{"terms": ["termos de busca em INGLÊS, separados"], "category": "categoria ou null", "max_price": número ou null}',
-  "Regras:",
-  "- terms: 2 a 6 termos em inglês que casem com os tipos de produto acima (ex.: 'tênis de corrida' → ['shoes','sneakers','canvas shoes']).",
-  "- Se a query tem preço ('até 300', 'até R$ 300'), coloque o número em max_price.",
-  "- category: 'sticker', 'camiseta', 'moletom', 'caneca', 'mochila', 'garrafa', 'boné', 'caderno', 'bolsa', 'calçado', 'acessório' ou null.",
-  "- NÃO invente produtos. Só devolva o JSON.",
-].join("\n");
+/** Prompt dinâmico com as categorias reais do catálogo da loja. */
+function intentSystemPrompt(categories: CatalogCategory[]): string {
+  const hint = categories.map((c) => c.label.toLowerCase()).join(", ");
+  return [
+    "Você é o motor de entendimento de intenção de busca de uma loja de e-commerce.",
+    `O catálogo desta loja tem: ${hint}.`,
+    "Receba a query do cliente (em português, pode ter typos e regionalismos) e responda APENAS com JSON:",
+    '{"terms": ["termos de busca em INGLÊS, separados"], "category": "categoria ou null", "max_price": número ou null, "refinement_options": ["2-4 opções curtas em português para continuar refinando"]}',
+    "Regras:",
+    "- terms: 2 a 6 termos em inglês que casem com os tipos de produto ACIMA (não invente tipos fora da lista).",
+    "- refinement_options: 2 a 4 opções contextuais (ex.: query de calçado → ['Casual', 'Esportivo', 'Dia a dia']; query de adesivo → ['Programação', 'Comunidade', 'Frases']).",
+    "- Se a query tem preço ('até 300', 'até R$ 300'), coloque o número em max_price.",
+    "- category: 'sticker', 'camiseta', 'moletom', 'caneca', 'mochila', 'garrafa', 'boné', 'caderno', 'bolsa', 'calçado', 'acessório' ou null.",
+    "- NUNCA afirme cor, material ou atributo que não exista no catálogo.",
+    "- NÃO invente produtos. Só devolva o JSON.",
+  ].join("\n");
+}
 
 function fallbackIntent(query: string): Intent {
   const maxPrice = extractMaxPrice(query);
@@ -153,21 +165,36 @@ function combinedSearch(
 const INTENT_CACHE_TTL_MS = 10 * 60_000;
 const intentCache = new Map<string, { at: number; intent: Intent }>();
 
-async function understandIntent(query: string): Promise<Intent> {
+interface IntentResult extends Intent {
+  refinement_options: string[];
+}
+
+async function understandIntent(
+  query: string,
+  categories: CatalogCategory[],
+): Promise<IntentResult> {
   const key = normalize(query);
   const hit = intentCache.get(key);
-  if (hit && Date.now() - hit.at < INTENT_CACHE_TTL_MS) return hit.intent;
+  if (hit && Date.now() - hit.at < INTENT_CACHE_TTL_MS) {
+    return { ...hit.intent, refinement_options: [] };
+  }
 
   let intent: Intent | null = null;
+  let options: string[] = [];
   try {
     const raw = await chat(
       [
-        { role: "system", content: INTENT_SYSTEM_PROMPT },
+        { role: "system", content: intentSystemPrompt(categories) },
         { role: "user", content: `Query do cliente: "${query}"` },
       ],
-      { maxTokens: 600, temperature: 0 },
+      { maxTokens: 700, temperature: 0 },
     );
-    const parsed = extractJson<Intent>(raw);
+    const parsed = extractJson<{
+      terms?: unknown;
+      category?: unknown;
+      max_price?: unknown;
+      refinement_options?: unknown;
+    }>(raw);
     if (parsed && Array.isArray(parsed.terms) && parsed.terms.length > 0) {
       intent = {
         terms: parsed.terms.slice(0, 6).map(String),
@@ -177,6 +204,11 @@ async function understandIntent(query: string): Promise<Intent> {
             ? parsed.max_price
             : null,
       };
+      if (Array.isArray(parsed.refinement_options)) {
+        options = parsed.refinement_options
+          .filter((o): o is string => typeof o === "string" && o.length > 0)
+          .slice(0, 4);
+      }
     }
   } catch (err) {
     if (err instanceof LlmError) {
@@ -186,7 +218,10 @@ async function understandIntent(query: string): Promise<Intent> {
 
   const final = intent ?? fallbackIntent(query);
   intentCache.set(key, { at: Date.now(), intent: final });
-  return final;
+  return {
+    ...final,
+    refinement_options: options.length >= 2 ? options : ["Mais barato", "Mais caro"],
+  };
 }
 
 function pickProducts(results: ScoredProduct[], excludeIds: string[]): ScoredProduct[] {
@@ -256,10 +291,9 @@ export const searchRecoveryTool = (_env: Env) =>
       const activeSession = session ?? createSession(query);
       if (session) touchSession(session.id);
 
-      const [catalog, intent] = await Promise.all([
-        fetchCatalog(),
-        understandIntent(query),
-      ]);
+      const catalog = await fetchCatalog();
+      const categories = deriveCatalogCategories(catalog);
+      const intent = await understandIntent(query, categories);
 
       const maxPrice = intent.max_price ?? extractMaxPrice(query);
       const { results, lowConfidence } = combinedSearch(
@@ -343,6 +377,7 @@ export const searchRecoveryTool = (_env: Env) =>
         products: finalProducts.map(toProductOutput),
         explanation,
         follow_up_question: followUp,
+        refinement_options: intent.refinement_options,
       };
     },
   });

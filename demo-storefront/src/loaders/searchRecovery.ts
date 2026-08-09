@@ -25,6 +25,8 @@ export interface RecoveryResult {
   products: RecoveryProduct[];
   explanation: string;
   follow_up_question: string;
+  /** Chips de refinamento dinâmicos vindos do backend (opcional). */
+  refinement_options?: string[];
 }
 
 export interface ReengageResult {

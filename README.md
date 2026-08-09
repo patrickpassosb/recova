@@ -52,7 +52,7 @@ recova/
 
 - **mcp-app**: Bun + @decocms/runtime (MCP server) + React 19 + shadcn/ui — tools com UI
 - **demo-storefront**: TanStack Start + React 19 + Cloudflare Workers + Shopify Storefront API (loja demo `gimenesdevstore`)
-- **LLM**: DeepSeek V4 Flash (via Aperture, `ai.tail492ce8.ts.net/v1`) — custo < R$0.05/conversa
+- **LLM**: DeepSeek V4 Flash (API oficial do Ollama Cloud, `ollama.com/v1`) — custo < R$0.05/conversa
 
 ## Como rodar
 

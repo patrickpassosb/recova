@@ -140,6 +140,8 @@ export default function SearchModal({
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [recoveryTerm, setRecoveryTerm] = useState<string | null>(null);
+  // Termos que o usuário fechou manualmente — não reabrir automaticamente
+  const dismissedTermsRef = useRef<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -229,10 +231,6 @@ export default function SearchModal({
           count: SUGGESTION_COUNT,
         })) as { products?: Product[] } | null;
         if (!cancelled) setProducts(result?.products ?? []);
-        // Zero resultados (ou baixa relevância) → agente de recuperação entra
-        if (!cancelled && (result?.products?.length ?? 0) === 0) {
-          setRecoveryTerm(query);
-        }
       } catch {
         if (!cancelled) setProducts([]);
       } finally {
@@ -254,6 +252,20 @@ export default function SearchModal({
     const events = window.DECO?.events as unknown as
       { dispatch?: (event: unknown) => void } | undefined;
     events?.dispatch?.({ name: "search", params: { search_term: query } });
+
+    // Zero resultados → agente de recuperação entra SÓ após o Enter
+    // (não enquanto digita). Termos fechados manualmente não reabrem.
+    if (dismissedTermsRef.current.has(query)) return;
+    invoke.site.loaders.searchSuggestions({ query, count: SUGGESTION_COUNT })
+      .then((result) => {
+        const products = (result as { products?: Product[] } | null)?.products;
+        if (!products || products.length === 0) {
+          setRecoveryTerm(query);
+        }
+      })
+      .catch(() => {
+        // sem sugestões → não abre a Recova
+      });
   };
 
   // The mobile trigger lives inside the frosted header bar, and a non-`none`
@@ -367,7 +379,10 @@ export default function SearchModal({
       {recoveryTerm && (
         <SearchRecoveryOverlay
           term={recoveryTerm}
-          onClose={() => setRecoveryTerm(null)}
+          onClose={() => {
+            dismissedTermsRef.current.add(recoveryTerm);
+            setRecoveryTerm(null);
+          }}
         />
       )}
     </>

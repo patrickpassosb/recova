@@ -10,13 +10,15 @@ import { z } from "zod";
 import type { Env } from "../types/env.ts";
 import { chat, extractJson, LlmError } from "../lib/llm.ts";
 import {
+  deriveCatalogCategories,
   extractMaxPrice,
   fetchCatalog,
+  findCategoryForTerms,
   isStopword,
   lexicalSearch,
   normalize,
-  popularProducts,
   toProductOutput,
+  type CatalogCategory,
   type CatalogProduct,
   type ScoredProduct,
 } from "../lib/shopify.ts";
@@ -59,27 +61,51 @@ export const converseOutputSchema = z.object({
     .describe("3+ produtos relevantes à resposta do cliente"),
   explanation: z.string().describe("Explicação do porquê estes produtos foram escolhidos"),
   follow_up_question: z.string().describe("Nova pergunta de refinamento (loop)"),
+  refinement_options: z
+    .array(z.string())
+    .optional()
+    .describe("2-4 opções de refinamento (chips) relevantes à resposta do cliente — ex.: ['Casual', 'Esportivo', 'Dia a dia']"),
 });
 
 export type ConverseOutput = z.infer<typeof converseOutputSchema>;
-
-const REFINE_SYSTEM_PROMPT = [
-  "Você é o agente de recuperação de busca de uma loja de e-commerce.",
-  "O catálogo da loja tem estes tipos de produto: sticker, t-shirt, tee, hoodie, sweatshirt, raglan hoodie, bomber jacket, rain jacket, mug, tumbler, bottle, water bottle, backpack, tote bag, hat, bucket hat, winter hat, notebook, pen, pillow, snap case, flip flops, slides, canvas shoes, sneakers, shorts.",
-  "O cliente respondeu a uma pergunta de refinamento. Entenda a resposta e responda APENAS com JSON:",
-  '{"terms": ["termos de busca em INGLÊS, separados"], "max_price": número ou null, "sort_by_price": "asc" | "desc" | null}',
-  "Regras:",
-  "- terms: 2 a 6 termos em inglês que casem com os tipos de produto acima.",
-  "- Se a resposta menciona preço numérico ('até 100', 'até R$ 50'), coloque o número em max_price.",
-  "- Se a resposta pede o mais barato/baratinho ('mais barato', 'baratinho', 'mais em conta', 'quero o mais barato'), use sort_by_price: 'asc'.",
-  "- Se a resposta pede o mais caro/premium, use sort_by_price: 'desc'.",
-  "- NÃO invente produtos. Só devolva o JSON.",
-].join("\n");
 
 interface RefineIntent {
   terms: string[];
   max_price: number | null;
   sort_by_price?: "asc" | "desc" | null;
+}
+
+/** Gera o prompt de refinamento com as categorias reais do catálogo da loja. */
+function refineSystemPrompt(categories: CatalogCategory[]): string {
+  const hint = categories.map((c) => c.label.toLowerCase()).join(", ");
+  return [
+    "Você é o agente de recuperação de busca de uma loja de e-commerce.",
+    `O catálogo desta loja tem: ${hint}.`,
+    "O cliente respondeu a uma pergunta de refinamento. Entenda a resposta e responda APENAS com JSON:",
+    '{"terms": ["termos de busca em INGLÊS, separados"], "max_price": número ou null, "sort_by_price": "asc" | "desc" | null, "refinement_options": ["2-4 opções curtas em português para continuar refinando"]}',
+    "Regras:",
+    "- terms: 2 a 6 termos em inglês que casem com os tipos de produto ACIMA (não invente tipos fora da lista).",
+    "- refinement_options: 2 a 4 opções contextuais (ex.: cliente pediu calçado → ['Casual', 'Esportivo', 'Dia a dia']; pediu adesivo → ['Programação', 'Comunidade', 'Frases']).",
+    "- Se a resposta menciona preço numérico ('até 100', 'até R$ 50'), coloque o número em max_price.",
+    "- Se a resposta pede o mais barato/baratinho ('mais barato', 'baratinho', 'mais em conta', 'quero o mais barato'), use sort_by_price: 'asc'.",
+    "- Se a resposta pede o mais caro/premium, use sort_by_price: 'desc'.",
+    "- NUNCA afirme cor, material ou atributo que não exista no catálogo. Se o cliente pedir cor, diga que não há filtro por cor (via follow_up_question).",
+    "- NÃO invente produtos. Só devolva o JSON.",
+  ].join("\n");
+}
+
+/** Chips de fallback determinístico quando a LLM falha. */
+function fallbackRefinementOptions(
+  categories: CatalogCategory[],
+  refine: RefineIntent,
+): string[] {
+  const cat = findCategoryForTerms(categories, refine.terms);
+  if (cat?.id === "calçado") return ["Casual", "Esportivo", "Dia a dia"];
+  if (cat?.id === "adesivo") return ["Programação", "Comunidade", "Frases"];
+  if (cat?.id === "camiseta") return ["Básica", "Estampada", "Oversize"];
+  if (cat?.id === "caneca") return ["Caneca", "Garrafa", "Térmico"];
+  if (cat) return ["Mais barato", "Mais caro", "Outro estilo"];
+  return ["Mais barato", "Mais caro"];
 }
 
 function fallbackRefine(response: string): RefineIntent {
@@ -97,28 +123,43 @@ function fallbackRefine(response: string): RefineIntent {
   return { terms, max_price: maxPrice ?? null, sort_by_price };
 }
 
+interface RefineResult extends RefineIntent {
+  refinement_options: string[];
+}
+
 async function refineIntent(
   response: string,
   history: string,
-): Promise<RefineIntent> {
+  categories: CatalogCategory[],
+): Promise<RefineResult> {
   try {
     const raw = await chat(
       [
-        { role: "system", content: REFINE_SYSTEM_PROMPT },
+        { role: "system", content: refineSystemPrompt(categories) },
         {
           role: "user",
           content: `Histórico da conversa:\n${history}\n\nResposta do cliente: "${response}"`,
         },
       ],
-      { maxTokens: 600, temperature: 0 },
+      { maxTokens: 700, temperature: 0 },
     );
-    const parsed = extractJson<RefineIntent>(raw);
+    const parsed = extractJson<{
+      terms?: unknown;
+      max_price?: unknown;
+      sort_by_price?: unknown;
+      refinement_options?: unknown;
+    }>(raw);
     if (parsed && Array.isArray(parsed.terms) && parsed.terms.length > 0) {
       const sort =
         parsed.sort_by_price === "asc" || parsed.sort_by_price === "desc"
           ? parsed.sort_by_price
           : null;
-      return {
+      const options = Array.isArray(parsed.refinement_options)
+        ? parsed.refinement_options
+            .filter((o): o is string => typeof o === "string" && o.length > 0)
+            .slice(0, 4)
+        : [];
+      const base: RefineIntent = {
         terms: parsed.terms.slice(0, 6).map(String),
         max_price:
           typeof parsed.max_price === "number" && parsed.max_price > 0
@@ -126,34 +167,41 @@ async function refineIntent(
             : null,
         sort_by_price: sort,
       };
+      return {
+        ...base,
+        refinement_options:
+          options.length >= 2
+            ? options
+            : fallbackRefinementOptions(categories, base),
+      };
     }
   } catch (err) {
     if (err instanceof LlmError) {
       console.warn(`[converse] LLM indisponível, fallback lexical: ${err.message}`);
     }
   }
-  return fallbackRefine(response);
+  const base = fallbackRefine(response);
+  return {
+    ...base,
+    refinement_options: fallbackRefinementOptions(categories, base),
+  };
 }
 
 function searchWithRefinement(
   catalog: CatalogProduct[],
   refine: RefineIntent,
-  sessionTerms: string[],
   maxPrice: number | undefined,
 ): ScoredProduct[] {
   const llmResults = lexicalSearch(catalog, refine.terms, maxPrice);
-  const rawResults = lexicalSearch(catalog, sessionTerms, maxPrice);
 
-  const byId = new Map<string, ScoredProduct>();
-  for (const r of [...llmResults, ...rawResults]) {
-    const existing = byId.get(r.product.id);
-    if (!existing || r.score > existing.score) byId.set(r.product.id, r);
-  }
-  const merged = [...byId.values()].sort(
+  // Relevância mínima: pelo menos metade dos termos do cliente casou.
+  // Evita falso positivo (ex.: "qual tipo de tenis" retornando stickers).
+  const relevant = llmResults.filter((r) => r.rawCoverage >= 0.5);
+  const results = relevant.length >= 3 ? relevant : llmResults;
+
+  return results.sort(
     (a, b) => b.score - a.score || a.product.price - b.product.price,
   );
-  const filtered = merged.filter((r) => r.score >= 0.1);
-  return filtered.length >= 3 ? filtered : merged;
 }
 
 export const converseTool = (_env: Env) =>
@@ -185,20 +233,15 @@ export const converseTool = (_env: Env) =>
         .map((m) => `${m.role === "user" ? "Cliente" : "Agente"}: ${m.content}`)
         .join("\n");
 
-      const [catalog, refine] = await Promise.all([
-        fetchCatalog(),
-        refineIntent(user_response, history),
-      ]);
+      const catalog = await fetchCatalog();
+      const categories = deriveCatalogCategories(catalog);
+      const refine = await refineIntent(user_response, history, categories);
 
       const maxPrice = refine.max_price ?? extractMaxPrice(user_response);
-      const sessionTerms = normalize(session.originalQuery)
-        .split(" ")
-        .filter((t) => t.length > 1 && !isStopword(t) && !/^\d+$/.test(t));
 
       let results = searchWithRefinement(
         catalog,
         refine,
-        sessionTerms,
         maxPrice ?? undefined,
       );
 
@@ -219,16 +262,20 @@ export const converseTool = (_env: Env) =>
           );
       const pool = fresh.length >= 3 ? fresh : results;
       let products = pool.slice(0, 5);
-      // Garante o mínimo de 3 no contrato, completando com bestsellers quando
-      // o refinamento não chega a 3 resultados. O padding respeita o teto de
-      // preço (não estoura o orçamento do cliente).
+      // Garante o mínimo de 3 no contrato, completando com produtos da MESMA
+      // categoria dos termos do cliente (ex.: pediu tênis → completa com
+      // calçados, não com stickers). O padding respeita o teto de preço
+      // (não estoura o orçamento do cliente).
       if (products.length < 3) {
         const seen = new Set(products.map((p) => p.product.id));
-        const pad = popularProducts(catalog, 5)
-          .filter((p) => !seen.has(p.id))
-          .filter((p) => maxPrice === undefined || p.price <= maxPrice)
-          .map((p) => ({
-            product: p,
+        const cat = findCategoryForTerms(categories, refine.terms);
+        const padTerms = cat?.terms ?? refine.terms;
+        const pad = lexicalSearch(catalog, padTerms)
+          .filter((r) => !seen.has(r.product.id))
+          .filter((r) => maxPrice === undefined || r.product.price <= maxPrice)
+          .slice(0, 5 - products.length)
+          .map((r) => ({
+            product: r.product,
             score: 0,
             matchType: "PARTIAL" as const,
             rawHits: 0,
@@ -251,12 +298,55 @@ export const converseTool = (_env: Env) =>
           : refine.sort_by_price === "desc"
             ? " do mais caro para o mais barato"
             : "";
-      const explanation =
-        `Entendi: "${user_response}". Refinei a busca${priceNote}${sortNote} e encontrei: ` +
-        `${names}.`;
-      const followUp = products[0]
-        ? `Algum desses te atende? Se quiser, me conta: prefere ${products[0].product.title} ou quer outra opção?`
-        : "O que exatamente você está procurando?";
+
+      // Explicação natural gerada pela LLM (com fallback para o template).
+      let explanation: string;
+      let followUp: string;
+      try {
+        const raw = await chat(
+          [
+            {
+              role: "system",
+              content: [
+                "Você é o agente de recuperação de busca de uma loja de e-commerce.",
+                "O cliente respondeu a uma pergunta de refinamento e você encontrou produtos.",
+                "Responda APENAS com JSON:",
+                '{"explanation": "explicação curta e natural em português do que você entendeu e encontrou, citando os produtos", "follow_up_question": "uma pergunta curta de refinamento em português"}',
+                "Regras:",
+                "- Explicação em 1-2 frases, tom de vendedor atencioso, sem listar preços.",
+                "- follow_up_question: uma única pergunta para continuar refinando.",
+                "- NUNCA afirme cor, material ou atributo que não exista nos produtos encontrados. Se o cliente pediu uma cor, diga que não há filtro por cor e ofereça as opções disponíveis.",
+                "- NÃO invente produtos. Só devolva o JSON.",
+              ].join("\n"),
+            },
+            {
+              role: "user",
+              content:
+                `Histórico:\n${history}\n\n` +
+                `Resposta do cliente: "${user_response}"\n` +
+                `Produtos encontrados: ${names}.`,
+            },
+          ],
+          { maxTokens: 300, temperature: 0.4 },
+        );
+        const parsed = extractJson<{ explanation?: string; follow_up_question?: string }>(raw);
+        if (parsed?.explanation && parsed.follow_up_question) {
+          explanation = parsed.explanation;
+          followUp = parsed.follow_up_question;
+        } else {
+          throw new LlmError("JSON incompleto");
+        }
+      } catch (err) {
+        if (err instanceof LlmError) {
+          console.warn(`[converse] LLM indisponível p/ explicação, template: ${err.message}`);
+        }
+        explanation =
+          `Entendi: "${user_response}". Refinei a busca${priceNote}${sortNote} e encontrei: ` +
+          `${names}.`;
+        followUp = products[0]
+          ? `Algum desses te atende? Se quiser, me conta: prefere ${products[0].product.title} ou quer outra opção?`
+          : "O que exatamente você está procurando?";
+      }
 
       addMessage(session, "user", user_response);
       addMessage(session, "assistant", `${explanation}\n${followUp}`);
@@ -266,6 +356,7 @@ export const converseTool = (_env: Env) =>
         products: products.map(toProductOutput),
         explanation,
         follow_up_question: followUp,
+        refinement_options: refine.refinement_options,
       };
     },
   });

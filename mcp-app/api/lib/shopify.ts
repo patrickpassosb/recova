@@ -109,6 +109,80 @@ export async function fetchCatalog(): Promise<CatalogProduct[]> {
   return products;
 }
 
+/** Categoria derivada do catálogo real (100% dinâmico, funciona em qualquer loja). */
+export interface CatalogCategory {
+  id: string;
+  /** Rótulo em português para o prompt da LLM e para os chips. */
+  label: string;
+  /** Termos de busca (inglês) que casam com esta categoria no catálogo. */
+  terms: string[];
+  /** Padrões de título que definem a categoria. */
+  titlePattern: RegExp;
+}
+
+/**
+ * Padrões de família de produto (título → categoria). A ordem importa:
+ * padrões mais específicos primeiro (ex.: "water bottle" antes de "bottle").
+ */
+const CATEGORY_PATTERNS: Array<Omit<CatalogCategory, "titlePattern"> & { titlePattern: RegExp }> = [
+  { id: "calçado", label: "Calçados", terms: ["shoes", "sneakers", "canvas shoes", "flip flops", "slides"], titlePattern: /canvas shoe|sneaker|flip flop|slide|high top/i },
+  { id: "camiseta", label: "Camisetas", terms: ["t-shirt", "tee", "shirt"], titlePattern: /t-shirt|tee|shirt/i },
+  { id: "moletom", label: "Moletons e suéteres", terms: ["hoodie", "sweatshirt"], titlePattern: /hoodie|sweatshirt/i },
+  { id: "jaqueta", label: "Jaquetas", terms: ["jacket"], titlePattern: /jacket/i },
+  { id: "calça", label: "Calças", terms: ["pants", "sweatpants", "joggers"], titlePattern: /sweatpant|jogger|pant/i },
+  { id: "caneca", label: "Canecas e garrafas", terms: ["mug", "tumbler", "bottle", "water bottle"], titlePattern: /mug|tumbler|bottle/i },
+  { id: "bolsa", label: "Bolsas e mochilas", terms: ["backpack", "tote bag", "bag"], titlePattern: /backpack|tote|bag/i },
+  { id: "boné", label: "Bonés e chapéus", terms: ["hat", "bucket hat", "winter hat", "cap"], titlePattern: /hat|cap/i },
+  { id: "caderno", label: "Cadernos", terms: ["notebook"], titlePattern: /notebook/i },
+  { id: "caneta", label: "Canetas", terms: ["pen"], titlePattern: /pen/i },
+  { id: "almofada", label: "Almofadas", terms: ["pillow"], titlePattern: /pillow/i },
+  { id: "capa", label: "Capas de celular", terms: ["snap case", "case"], titlePattern: /case/i },
+  { id: "adesivo", label: "Adesivos", terms: ["sticker"], titlePattern: /sticker/i },
+];
+
+/**
+ * Deriva as categorias que EXISTEM no catálogo da loja.
+ * Qualquer loja plugada ganha categorias corretas — nada de lista fixa.
+ */
+export function deriveCatalogCategories(catalog: CatalogProduct[]): CatalogCategory[] {
+  const present: CatalogCategory[] = [];
+  for (const pattern of CATEGORY_PATTERNS) {
+    const has = catalog.some((p) => pattern.titlePattern.test(p.title));
+    if (has) {
+      present.push({
+        id: pattern.id,
+        label: pattern.label,
+        terms: pattern.terms,
+        titlePattern: pattern.titlePattern,
+      });
+    }
+  }
+  return present;
+}
+
+/** Descrição das categorias para o prompt da LLM (ex.: "calçados, camisetas, canecas"). */
+export function categoriesPromptHint(categories: CatalogCategory[]): string {
+  if (categories.length === 0) return "produtos variados";
+  return categories.map((c) => `${c.label} (${c.terms.join(", ")})`).join(", ");
+}
+
+/**
+ * Encontra a categoria mais provável para um conjunto de termos de busca.
+ * Usado no padding: completa com produtos da MESMA família do pedido.
+ */
+export function findCategoryForTerms(
+  categories: CatalogCategory[],
+  terms: string[],
+): CatalogCategory | null {
+  for (const cat of categories) {
+    const hit = terms.some((t) =>
+      cat.terms.some((term) => t.includes(term) || term.includes(t)),
+    );
+    if (hit) return cat;
+  }
+  return null;
+}
+
 /** Normaliza texto para comparação: minúsculas, sem acentos, sem pontuação. */
 export function normalize(text: string): string {
   return text
@@ -138,6 +212,14 @@ export const SYNONYMS: Record<string, string[]> = {
   sapato: ["shoes", "sneakers", "canvas shoes", "slides"],
   chinelo: ["flip flops", "slides"],
   corrida: ["running", "shoes", "sneakers", "canvas shoes"],
+  // Sinônimos EN→EN: a LLM gera termos em inglês que precisam casar com os
+  // títulos reais do catálogo (ex.: "sneakers" → "High Top Canvas Shoes").
+  sneakers: ["sneakers", "shoes", "canvas shoes"],
+  shoes: ["shoes", "sneakers", "canvas shoes"],
+  running: ["running", "shoes", "sneakers", "canvas shoes"],
+  "flip flops": ["flip flops", "slides"],
+  slides: ["slides", "flip flops"],
+  "canvas shoes": ["canvas shoes", "shoes", "sneakers"],
   camiseta: ["t-shirt", "tee", "shirt", "oversize t-shirt"],
   camisa: ["t-shirt", "tee", "shirt"],
   caneca: ["mug", "tumbler"],

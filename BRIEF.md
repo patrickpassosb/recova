@@ -90,18 +90,19 @@ Anotação do criador (funcionalidade de configuração): "uma pergunta ou 3 res
 
 ## 6. LLM (DeepSeek V4 Flash)
 
-- **Endpoint:** `http://ai.tail492ce8.ts.net/v1` (Aperture via tailnet — acessível da VPS)
-- **Auth:** `Authorization: Bearer not-required`
-- **Model:** `ollama-cloud/deepseek-v4-flash:0731` (ou `accounts/fireworks/models/deepseek-v4-flash-0731`)
+- **Endpoint:** `https://ollama.com/v1/chat/completions` (API oficial do Ollama Cloud, OpenAI-compatível)
+- **Auth:** `Authorization: Bearer $OLLAMA_API_KEY` (variável de ambiente — ver `mcp-app/.env`, gitignored)
+- **Model:** `deepseek-v4-flash:preview`
 - **Uso:** entender intenção, gerar explicações, gerar perguntas. Chamadas curtas (max_tokens ~500-800), com fallback para busca lexical simples se o LLM falhar
 - **Custo alvo:** < R$0.05 por conversa
+- **Nota:** usar `reasoning_effort: "none"` no payload — o DeepSeek ignora `think: false` e gasta todos os tokens em reasoning (content vazio)
 
 Exemplo de chamada:
 ```bash
-curl -s http://ai.tail492ce8.ts.net/v1/chat/completions \
+curl -s https://ollama.com/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer not-required" \
-  -d '{"model":"ollama-cloud/deepseek-v4-flash:0731","messages":[{"role":"user","content":"..."}]}'
+  -H "Authorization: Bearer $OLLAMA_API_KEY" \
+  -d '{"model":"deepseek-v4-flash:preview","messages":[{"role":"user","content":"..."}],"reasoning_effort":"none"}'
 ```
 
 ## 7. Critérios de aceite (verificação por comando)

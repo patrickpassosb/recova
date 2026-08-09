@@ -1,6 +1,7 @@
 /**
- * Cliente LLM — DeepSeek V4 Flash via Aperture (tailnet da VPS).
- * Endpoint: http://ai.tail492ce8.ts.net/v1 (OpenAI-compatível, sem auth).
+ * Cliente LLM — DeepSeek V4 Flash via API oficial do Ollama Cloud.
+ * Endpoint: https://ollama.com/v1/chat/completions (OpenAI-compatível).
+ * Auth: Bearer OLLAMA_API_KEY (variável de ambiente, ver .env).
  *
  * Chamadas curtas (max_tokens ~500) e com timeout agressivo: o agente precisa
  * responder em <2s. Se o LLM falhar ou demorar, os callers usam fallback
@@ -12,9 +13,10 @@ export interface LlmMessage {
   content: string;
 }
 
-const LLM_URL = "http://ai.tail492ce8.ts.net/v1/chat/completions";
-const LLM_MODEL = "ollama-cloud/deepseek-v4-flash:0731";
-const LLM_TIMEOUT_MS = 900;
+const LLM_URL = "https://ollama.com/v1/chat/completions";
+const LLM_MODEL = "deepseek-v4-flash:preview";
+const LLM_API_KEY = process.env.OLLAMA_API_KEY ?? "";
+const LLM_TIMEOUT_MS = 3000;
 
 export class LlmError extends Error {}
 
@@ -25,6 +27,10 @@ export async function chat(
 ): Promise<string> {
   const { maxTokens = 600, temperature = 0.3 } = opts;
 
+  if (!LLM_API_KEY) {
+    throw new LlmError("OLLAMA_API_KEY não configurada (ver mcp-app/.env)");
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
@@ -34,7 +40,7 @@ export async function chat(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer not-required",
+        Authorization: `Bearer ${LLM_API_KEY}`,
       },
       body: JSON.stringify({
         model: LLM_MODEL,
@@ -43,7 +49,7 @@ export async function chat(
         temperature,
         // Desliga o bloco de raciocínio do DeepSeek: sem isso o modelo gasta
         // todos os tokens em `reasoning` e o content sai vazio/truncado.
-        think: false,
+        reasoning_effort: "none",
       }),
       signal: controller.signal,
     });

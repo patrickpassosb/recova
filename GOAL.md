@@ -29,7 +29,7 @@ Implementar o **Search Recovery Agent** funcional no repo `/root/search-recovery
 - Não quebrar o build dos apps (verificar `bun run dev` após cada mudança)
 - Não modificar código fora das boundaries do BRIEF
 - Todo código, commits e README em **português**
-- LLM: DeepSeek V4 Flash via `http://ai.tail492ce8.ts.net/v1`, `Authorization: Bearer not-required` (ver BRIEF seção 6)
+- LLM: DeepSeek V4 Flash via API oficial do Ollama Cloud (`https://ollama.com/v1/chat/completions`), `Authorization: Bearer $OLLAMA_API_KEY` (ver BRIEF seção 6)
 
 ## Boundaries
 

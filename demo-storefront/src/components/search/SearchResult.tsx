@@ -1,7 +1,7 @@
 import type { ProductListingPage } from "@decocms/apps-commerce/types";
 import { BreadcrumbJsonLd, PLPJsonLd } from "@decocms/blocks/hooks";
 import { mapProductToAnalyticsItem } from "@decocms/apps-commerce/utils/productToAnalyticsItem";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useOffer } from "@decocms/apps-commerce/sdk/useOffer";
 import { useRouterState } from "@tanstack/react-router";
 import { useSendEvent } from "../../sdk/useSendEvent";
@@ -62,6 +62,8 @@ function Result({
   const filterDrawerId = useId();
   // Termo da busca atual (para o agente de recuperação em zero results)
   const [recoveryTerm, setRecoveryTerm] = useState<string | null>(null);
+  // Termos que o usuário fechou manualmente — não reabrir automaticamente
+  const dismissedTermsRef = useRef<Set<string>>(new Set());
 
   // Use the live URL for filter/sort/pagination link rebasing. The section
   // loader's `url` is the SSR URL — on client navigation the page re-renders
@@ -81,7 +83,12 @@ function Result({
   // Zero resultados → agente de recuperação entra automaticamente
   const searchTerm = new URL(href, "http://local").searchParams.get("q");
   const isZeroResults = products.length === 0 && Boolean(searchTerm);
-  if (isZeroResults && recoveryTerm !== searchTerm) {
+  if (
+    isZeroResults &&
+    searchTerm &&
+    recoveryTerm !== searchTerm &&
+    !dismissedTermsRef.current.has(searchTerm)
+  ) {
     setRecoveryTerm(searchTerm);
   }
 
@@ -109,7 +116,10 @@ function Result({
       {recoveryTerm && (
         <SearchRecoveryOverlay
           term={recoveryTerm}
-          onClose={() => setRecoveryTerm(null)}
+          onClose={() => {
+            dismissedTermsRef.current.add(recoveryTerm);
+            setRecoveryTerm(null);
+          }}
         />
       )}
       <div className="container flex w-full flex-col gap-5 px-3 py-4 sm:gap-8 sm:py-6">
