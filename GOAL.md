@@ -1,55 +1,60 @@
-# GOAL — Contrato do /goal (rodar no Hermes, profile software-engineer)
+# GOAL — Missão completa: Transcrição + Consertos + Vault (Dinosaurus Team 4th)
 
-> Colar este contrato no `/goal` do Hermes na VPS (profile `software-engineer`).
-> O Hermes também deve ler: `/root/obsidian-vault/Hackathons/Agents for Commerce Deco 2026/18 - PRD Search Recovery Agent.md` e `19 - Fluxograma Search Recovery.md`, e `/root/search-recovery/BRIEF.md`.
+**Deadline:** HOJE 09/08 23h59 (hackathon Agents for Commerce Deco 2026).
+**Modo:** autonomia total, loop até concluir TUDO. Não pare até cada item abaixo estar feito e verificado. Se algo falhar, tente de novo com abordagem diferente. Ao final, faça o relatório.
 
----
+## FASE 1 — Transcrever a reunião (Groq Whisper)
 
-## Outcome
+Arquivo: `/root/meeting.zip` (gravação Discord, 2 faixas FLAC Audacity, ~2h17min total).
 
-Implementar o **Search Recovery Agent** funcional no repo `/root/search-recovery`:
-- **mcp-app**: 4 tools MCP — `search_recovery`, `converse`, `reengage`, `analyze_zero_results` (padrão de `api/tools/hello.ts` com `createTool` + zod), registradas em `api/tools/index.ts`
-- **demo-storefront**: overlay conversacional na busca que abre automaticamente quando a busca retorna zero resultados, seguindo o fluxograma (agente entra com 3+ produtos <2s → cliente comprou ✅ / respondeu → loop / 30s → reengage → ❌)
-- README.md atualizado em português com instruções de como rodar
+1. Extraia o zip em `/root/meeting/`
+2. Converta as 2 faixas para MP3 mono 16kHz (ffmpeg)
+3. Divida em chunks de 10 minutos (<25MB cada, limite da Groq)
+4. Transcreva com Groq `whisper-large-v3-turbo`, `language=pt`:
+   - Endpoint: `https://api.groq.com/openai/v1/audio/transcriptions`
+   - Auth: `GROQ_API_KEY` (em `~/.hermes/.env`)
+   - 3 workers paralelos; retry com backoff em rate limit
+5. Monte `/root/meeting-transcricao.txt` com timestamps aproximados por chunk
+6. Copie para o vault: `/root/obsidian-vault/Hackathons/Agents for Commerce Deco 2026/23 - Reunião 09-08 Transcrição.md` (frontmatter: `type: Note`, `title`, `updated: "2026-08-09"`, `tags: [recova, hackathon, reuniao]`)
 
-## Verification (evidência concreta — mostrar output real de comandos)
+## FASE 2 — Extrair TODOS os pontos de ação da transcrição
 
-1. `bun run dev:api` no mcp-app sobe e `curl -X POST http://localhost:3001/api/mcp` com `tools/list` lista as 4 tools
-2. `time curl` na tool `search_recovery` com query "tênis de corrida até 300" → 3+ produtos, preço ≤300, <2s
-3. `converse` com 2+ iterações mantém contexto
-4. `reengage` respeita máx 2 tentativas
-5. `analyze_zero_results` gera relatório com causas classificadas
-6. `bun run dev` no demo-storefront sobe (Vite :5173, HTTP 200) e overlay aparece com termo de zero-results
-7. Estados ✅ verde e ❌ vermelho funcionam
+Leia a transcrição completa e liste TODOS os pedidos do Patrick sobre o produto Recova. Exemplos prováveis (verifique na transcrição):
+- Overlay não deve ser pop-up; integrado à página (embaixo da barra de busca)
+- Aparecer automaticamente se não houver recomendações ao digitar (~10s); no Enter aparecer na tela principal
+- Só acionar quando a busca não encontra produto
+- Produtos clicáveis (ir para página do produto) + Comprar adiciona ao carrinho de verdade
+- Remover textos auto-elogiosos ("A Recova vai recuperar uma venda que a busca nativa teria perdido")
+- Som de alerta no reengajamento (30s inatividade)
+- "Powered by Recova" clicável → landing page
+- Verificar senha da loja Shopify (gimenesdevstore) se necessário
+- Filtros por cor/atributos reais do catálogo (não inventar cores)
+- Anote o que o Gabriel disse sobre vídeos/slides (Fal AI, Google Veo, custos) como contexto (não agir)
 
-## Constraints
+## FASE 3 — Consertar o código (repo /root/search-recovery)
 
-- **NÃO usar a conta `patrickpassosb`** — push APENAS como `isaacnewtonagent` (colaborador, já configurado: `git config user.name/email` no repo)
-- **NÃO adicionar/alterar credenciais** — `adminAccessToken` do Shopify é criptografado (não mexer); busca usa `storefrontAccessToken` (texto puro)
-- Não quebrar o build dos apps (verificar `bun run dev` após cada mudança)
-- Não modificar código fora das boundaries do BRIEF
-- Todo código, commits e README em **português**
-- LLM: DeepSeek V4 Flash via API oficial do Ollama Cloud (`https://ollama.com/v1/chat/completions`), `Authorization: Bearer $OLLAMA_API_KEY` (ver BRIEF seção 6)
+Aplique TODOS os pontos de ação:
 
-## Boundaries
+- **demo-storefront** (TanStack Start + React 19 + Shopify):
+  - `src/components/search/SearchRecoveryOverlay.tsx` — overlay, chips, produtos clicáveis, som, textos
+  - `src/components/search/SearchResult.tsx` e `SearchModal.tsx` — disparo do agente
+  - `src/loaders/searchRecovery.ts` — contrato
+- **mcp-app** (Bun + MCP tools):
+  - `api/tools/searchRecovery.ts`, `converse.ts`, `reengage.ts`
+  - `api/lib/llm.ts` — API oficial Ollama Cloud (`https://ollama.com/v1/chat/completions`, model `deepseek-v4-flash:preview`, `OLLAMA_API_KEY` no `.env` do mcp-app; NUNCA commitar a chave)
+  - `api/lib/shopify.ts` — busca lexical, categorias dinâmicas
 
-- `/root/search-recovery/mcp-app/api/tools/` (tools), `api/tools/index.ts` (registro), `api/resources/` (UIs), `web/tools/` (React)
-- `/root/search-recovery/demo-storefront/src/components/search/` (overlay), `src/loaders/` (se necessário)
-- `docs/`, `README.md`
-- `package.json` dos dois apps (adicionar deps se necessário)
+Regras: nunca inventar produto/atributo; chips dinâmicos do catálogo; chat nunca encerra sozinho; Recova só no Enter; verifique com `bun run check` e `npm run typecheck`; teste fluxo completo (`bun run dev` mcp-app :3001, `npm run dev` demo-storefront :5173) — zero-results → overlay → conversa → chips → comprar → carrinho real.
 
-## Stop conditions (parar e reportar, NÃO improvisar)
+## FASE 4 — Commit e push
 
-1. Precisar de credencial/decissão fora do BRIEF
-2. `bun install` falhar além de 1 tentativa com `--force`
-3. LLM do Aperture inacessível (fallback: busca lexical + reportar)
-4. Nunca declarar done sem evidência de comando/teste
-5. Se o `bun run dev` do demo-storefront falhar por bloqueio de porta — matar processos antigos (`pkill -f vite` / `pkill -f "bun run dev"`) e tentar de novo
+1. Commit em português; 2. Push para `main` em `patrickpassosb/recova` (remote pode estar em `/root/search-recovery` — se antigo, `git remote set-url origin https://github.com/patrickpassosb/recova.git`); 3. Resolva conflitos mantendo as duas mudanças.
 
-## Notas
+## FASE 5 — Atualizar o vault
 
-- Prioridade: lógica das tools (T1-T4) → UIs → overlay
-- Commits atômicos e frequentes na main (mensagens em PT)
-- O mcp-app tem `bun start` que faz `deco link` — NÃO usar (requer login do Patrick); usar `bun run dev:api` direto
-- Demo-storefront: loja Shopify `gimenesdevstore` já configurada (produtos de exemplo existem)
-- Consultar o vault em `/root/obsidian-vault/Hackathons/Agents for Commerce Deco 2026/` para contexto completo (PRD, fluxograma, insights)
+1. Nota da reunião (Fase 1 passo 6); 2. Atualizar `22 - Sessão 08-08 Redesign Overlay Recova.md` com decisões de hoje; 3. Criar resumo de ações e o que foi consertado.
+
+## LOOP (crítico)
+
+Depois de concluir tudo, revise a transcrição UMA VEZ MAIS e verifique se NENHUM ponto de ação ficou de fora. Se faltou algo, implemente. Repita até esgotar todos os pontos. Só então entregue o relatório final:
+- Chunks transcritos / pontos de ação encontrados / o que foi consertado (arquivos) / testes / commit hash / push status / pendências com prioridade.
