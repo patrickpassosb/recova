@@ -29,10 +29,9 @@ import {
   type RecovaThemeConfig,
 } from "./recovaTheme";
 
-// Logo Recova (SVG oficial do vault) — usada no "Powered by Recova" quando
-// o tema não define logo própria (free tier).
-const recovaLogoDataUri =
-  "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+PCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj48c3ZnIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA1MzkgMTU5IiB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHhtbDpzcGFjZT0icHJlc2VydmUiIHN0eWxlPSJmaWxsLXJ1bGU6ZXZlbm9kZDtjbGlwLXJ1bGU6ZXZlbm9kZDtzdHJva2UtbGluZWpvaW46cm91bmQ7c3Ryb2tlLW1pdGVybGltaXQ6MjsiPjxnIGlkPSJGdW5kbyI+PHBhdGggZD0iTTc0LjgzOCw2MS41NTZjMC41NzYsLTIuNjk0IDEuMjE0LC03Ljg1MyA3LjEzMywtMTUuNzFjMTEuMTIyLC0xNC43NjYgMzUuNzA2LC0xNi44MjQgNDkuNDY3LC01LjI2NGMxMC40NjYsOC43OTMgMTMuNzExLDIzLjA0NCAxMi40NSwzMi45ODRjLTAuNDI0LDMuMzQzIC0yLjgsMi43NDcgLTQuMzkyLDIuODAyYy03LjAyMSwwLjI0MiAtNi45OTMsMC41MDMgLTE0LjAwNiwwLjY4NGMtMTcuMDExLDAuNDQgLTE2Ljk4NywwLjcwNyAtMzMuOTk0LDEuMjY4Yy0zLjQyNywwLjExMyAtNS4wNDQsLTAuMTA3IC00LjE4MSwzLjIyNmMwLjczNywyLjg0OSAyLjcyLDExLjQxOCAxMS45ODMsMTYuMzQ1YzEuNTc4LDAuODQgMTEuMzczLDYuMDQ5IDIyLjM0NiwtMC4xM2M2Ljk2NSwtMy45MjEgNi40MDMsLTYuNTc4IDkuMDA4LC01Ljc1M2MwLjU2MiwwLjE3OCAwLjYwMywwLjE5MSA1Ljc1Nyw0LjYwNGMxLjQ0NywxLjIzOCAyLjMwNCwwLjk2OCAxLjkzMiwyLjgzOWMtMC4wNzYsMC4zODIgLTAuMTQ3LDAuNzQyIC0zLjIyMSwzLjY1NGMtMTAuMTk2LDkuNjYxIC0yNS40NDMsMTAuNjcyIC0zNS43NDUsNy43NzNjLTcuMjg2LC0yLjA1MSAtMTMuMzQxLC03LjcwOSAtMTMuNDQ2LC03Ljc5OWMtMS42NjksLTEuNDMgLTUuOTYzLC02LjY4NSAtNy4wNDQsLTguNzk1Yy02Ljk3NywtMTMuNjMgLTQuOTg3LC0yNS43NzYgLTQuMDQ3LC0zMi43MjhabTIxLjY3Myw1LjEzNGMyNy41OTUsLTEuMDQgMjcuNTg5LC0xLjEzNyAyOS45ODksLTEuMTg5YzMuMTc1LC0wLjA3IDQuNTg5LDAuMTI1IDMuOTMyLC0yLjk4OGMtMC4xNDIsLTAuNjcxIC0xLjMyMSwtNy43NjQgLTcuMTA1LC0xMi44MDljLTEwLjc4NSwtOS40MDggLTMwLjAxNSwtNS43NjMgLTM1LjQ1MiwxMC45MjVjLTEuNTYxLDQuNzkgLTEuODQ3LDYuNTYgMS42MzEsNi4zMTljMC4yNTQsLTAuMDE4IDYuNDQ1LC0wLjIzOCA3LjAwNiwtMC4yNThaIiBzdHlsZT0iZmlsbDojMDcyZTUyOyIvPjwvZz48L3N2Zz4=";
+// Logos Recova oficiais do vault (free tier).
+const recovaLogoDark = "/recova/logo-horizontal.svg";
+const recovaLogoLight = "/recova/logo-horizontal-branco.svg";
 
 export interface SearchRecoveryOverlayProps {
   /** Termo da busca que retornou zero resultados */
@@ -568,15 +567,16 @@ export default function SearchRecoveryOverlay({
       role="dialog"
       aria-modal={variant === "popup"}
       aria-label={theme.copy.dialogAria}
-      className={`relative flex w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl ${
-        variant === "inline" ? "max-w-full" : "mx-3 mb-3 max-w-md sm:mb-0"
+      className={`relative flex w-full flex-col overflow-hidden rounded-lg bg-white border ${
+        variant === "inline" ? "max-w-full" : "mx-3 mb-3 max-w-md sm:mb-0 shadow-2xl"
       } ${isSuccess ? "ring-2" : ""}`}
       style={{
         fontFamily: theme.fonts.body,
+        borderColor: theme.colors.border,
         ...(isSuccess ? { boxShadow: `0 0 0 2px ${theme.colors.success}` } : {}),
       }}
     >
-      {/* Header */}
+      {/* Header — identidade Recova limpa: apenas o logo wordmark. */}
       <div
         className="flex items-center justify-between px-4 py-3"
         style={{
@@ -585,35 +585,11 @@ export default function SearchRecoveryOverlay({
         }}
       >
         <div className="flex items-center gap-2">
-          {theme.logo ? (
-            <img
-              src={theme.logo}
-              alt={theme.brandName}
-              className="h-8 w-auto"
-            />
-          ) : (
-            <span
-              className="flex size-8 items-center justify-center rounded-lg"
-              style={{ backgroundColor: theme.colors.primary }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4 12c0-4.4 3.6-8 8-8 2.2 0 4.2 0.9 5.7 2.3" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
-                <path d="M20 12c0 4.4-3.6 8-8 8-2.2 0-4.2-0.9-5.7-2.3" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
-                <path d="M12 4v8l4 4" stroke={theme.colors.accent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="12" cy="12" r="2" fill={theme.colors.accent} />
-              </svg>
-            </span>
-          )}
-          <div>
-            <p className="text-sm font-bold" style={{ fontFamily: theme.fonts.display }}>
-              {isSuccess ? theme.copy.buySuccessTitle : theme.brandName}
-            </p>
-            <p className="text-2xs opacity-80">
-              {isSuccess
-                ? theme.copy.buySuccessSubtitle
-                : `${theme.copy.recoveryPrefix} "${term}"`}
-            </p>
-          </div>
+          <img
+            src={theme.logo ?? recovaLogoLight}
+            alt={theme.brandName}
+            className="h-6 w-auto object-contain"
+          />
         </div>
         <button
           type="button"
@@ -663,19 +639,12 @@ export default function SearchRecoveryOverlay({
           >
             {msg.role === "agent" && (
               <div className="flex items-center gap-1.5">
-                <span
-                  className="flex size-5 items-center justify-center rounded-full"
+                <img
+                  src="/recova/logo-icone.svg"
+                  alt={theme.brandName}
+                  className="size-5 rounded-full object-contain"
                   style={{ backgroundColor: theme.colors.primary }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M4 12c0-4.4 3.6-8 8-8 2.2 0 4.2 0.9 5.7 2.3" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-                    <path d="M20 12c0 4.4-3.6 8-8 8-2.2 0-4.2-0.9-5.7-2.3" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-                    <path d="M12 4v8l4 4" stroke={theme.colors.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <span className="text-2xs font-semibold" style={{ color: theme.colors.muted }}>
-                  Assistente Recova
-                </span>
+                />
               </div>
             )}
             <div
@@ -808,24 +777,21 @@ export default function SearchRecoveryOverlay({
         </form>
       )}
 
-      {/* Powered by Recova (free tier) — clicável → landing page, com a logo */}
+      {/* Powered by Recova (free tier) — apenas "Powered by" + logo wordmark. */}
       {theme.showRecovaBranding && (
         <a
           href={theme.copy.poweredByUrl ?? "https://recova.app"}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 border-t px-3 py-1.5 text-2xs hover:opacity-80"
+          className="flex items-center justify-center gap-1.5 border-t px-3 py-2 text-2xs hover:opacity-80"
           style={{ borderColor: theme.colors.border, color: theme.colors.muted }}
         >
           <span>Powered by</span>
           <img
-            src={theme.logo ?? recovaLogoDataUri}
+            src={theme.logo ?? recovaLogoDark}
             alt={theme.brandName}
-            className="h-4 w-auto"
+            className="h-5 w-auto object-contain"
           />
-          <span className="font-semibold" style={{ color: theme.colors.text }}>
-            {theme.brandName}
-          </span>
         </a>
       )}
     </div>

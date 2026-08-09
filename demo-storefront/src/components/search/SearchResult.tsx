@@ -151,17 +151,17 @@ function Result({
 
   return (
     <div {...viewItemListEvent} className="w-full">
-      {recoveryTerm && (
-        <SearchRecoveryOverlay
-          term={recoveryTerm}
-          variant="inline"
-          onClose={() => {
-            dismissedTermsRef.current.add(recoveryTerm);
-            setRecoveryTerm(null);
-          }}
-        />
-      )}
-      <div className="container flex w-full flex-col gap-5 px-3 py-4 sm:gap-8 sm:py-6">
+      <div className="container flex w-full flex-col gap-5 px-3 pt-4 pb-4 sm:gap-8 sm:pt-6 sm:pb-6">
+        {recoveryTerm && (
+          <SearchRecoveryOverlay
+            term={recoveryTerm}
+            variant="inline"
+            onClose={() => {
+              dismissedTermsRef.current.add(recoveryTerm);
+              setRecoveryTerm(null);
+            }}
+          />
+        )}
         {/* SEO: schema.org JSON-LD, server-rendered inline (crawlers read it anywhere in the document) */}
         <PLPJsonLd page={page} />
         {breadcrumb && <BreadcrumbJsonLd breadcrumb={breadcrumb} />}
