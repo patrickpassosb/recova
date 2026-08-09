@@ -29,6 +29,11 @@ import {
   type RecovaThemeConfig,
 } from "./recovaTheme";
 
+// Logo Recova (SVG oficial do vault) — usada no "Powered by Recova" quando
+// o tema não define logo própria (free tier).
+const recovaLogoDataUri =
+  "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+PCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj48c3ZnIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA1MzkgMTU5IiB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHhtbDpzcGFjZT0icHJlc2VydmUiIHN0eWxlPSJmaWxsLXJ1bGU6ZXZlbm9kZDtjbGlwLXJ1bGU6ZXZlbm9kZDtzdHJva2UtbGluZWpvaW46cm91bmQ7c3Ryb2tlLW1pdGVybGltaXQ6MjsiPjxnIGlkPSJGdW5kbyI+PHBhdGggZD0iTTc0LjgzOCw2MS41NTZjMC41NzYsLTIuNjk0IDEuMjE0LC03Ljg1MyA3LjEzMywtMTUuNzFjMTEuMTIyLC0xNC43NjYgMzUuNzA2LC0xNi44MjQgNDkuNDY3LC01LjI2NGMxMC40NjYsOC43OTMgMTMuNzExLDIzLjA0NCAxMi40NSwzMi45ODRjLTAuNDI0LDMuMzQzIC0yLjgsMi43NDcgLTQuMzkyLDIuODAyYy03LjAyMSwwLjI0MiAtNi45OTMsMC41MDMgLTE0LjAwNiwwLjY4NGMtMTcuMDExLDAuNDQgLTE2Ljk4NywwLjcwNyAtMzMuOTk0LDEuMjY4Yy0zLjQyNywwLjExMyAtNS4wNDQsLTAuMTA3IC00LjE4MSwzLjIyNmMwLjczNywyLjg0OSAyLjcyLDExLjQxOCAxMS45ODMsMTYuMzQ1YzEuNTc4LDAuODQgMTEuMzczLDYuMDQ5IDIyLjM0NiwtMC4xM2M2Ljk2NSwtMy45MjEgNi40MDMsLTYuNTc4IDkuMDA4LC01Ljc1M2MwLjU2MiwwLjE3OCAwLjYwMywwLjE5MSA1Ljc1Nyw0LjYwNGMxLjQ0NywxLjIzOCAyLjMwNCwwLjk2OCAxLjkzMiwyLjgzOWMtMC4wNzYsMC4zODIgLTAuMTQ3LDAuNzQyIC0zLjIyMSwzLjY1NGMtMTAuMTk2LDkuNjYxIC0yNS40NDMsMTAuNjcyIC0zNS43NDUsNy43NzNjLTcuMjg2LC0yLjA1MSAtMTMuMzQxLC03LjcwOSAtMTMuNDQ2LC03Ljc5OWMtMS42NjksLTEuNDMgLTUuOTYzLC02LjY4NSAtNy4wNDQsLTguNzk1Yy02Ljk3NywtMTMuNjMgLTQuOTg3LC0yNS43NzYgLTQuMDQ3LC0zMi43MjhabTIxLjY3Myw1LjEzNGMyNy41OTUsLTEuMDQgMjcuNTg5LC0xLjEzNyAyOS45ODksLTEuMTg5YzMuMTc1LC0wLjA3IDQuNTg5LDAuMTI1IDMuOTMyLC0yLjk4OGMtMC4xNDIsLTAuNjcxIC0xLjMyMSwtNy43NjQgLTcuMTA1LC0xMi44MDljLTEwLjc4NSwtOS40MDggLTMwLjAxNSwtNS43NjMgLTM1LjQ1MiwxMC45MjVjLTEuNTYxLDQuNzkgLTEuODQ3LDYuNTYgMS42MzEsNi4zMTljMC4yNTQsLTAuMDE4IDYuNDQ1LC0wLjIzOCA3LjAwNiwtMC4yNThaIiBzdHlsZT0iZmlsbDojMDcyZTUyOyIvPjwvZz48L3N2Zz4=";
+
 export interface SearchRecoveryOverlayProps {
   /** Termo da busca que retornou zero resultados */
   term: string;
@@ -786,16 +791,21 @@ export default function SearchRecoveryOverlay({
         </form>
       )}
 
-      {/* Powered by Recova (free tier) — clicável → landing page */}
+      {/* Powered by Recova (free tier) — clicável → landing page, com a logo */}
       {theme.showRecovaBranding && (
         <a
           href={theme.copy.poweredByUrl ?? "https://recova.app"}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1 border-t px-3 py-1.5 text-2xs hover:underline"
+          className="flex items-center justify-center gap-1.5 border-t px-3 py-1.5 text-2xs hover:opacity-80"
           style={{ borderColor: theme.colors.border, color: theme.colors.muted }}
         >
-          {theme.copy.poweredBy ?? "Powered by Recova"}
+          <span>Powered by</span>
+          <img
+            src={theme.logo ?? recovaLogoDataUri}
+            alt={theme.brandName}
+            className="h-3.5 w-auto"
+          />
         </a>
       )}
     </div>

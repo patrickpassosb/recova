@@ -286,6 +286,9 @@ export default function SearchModal({
       .then((result) => {
         const products = (result as { products?: Product[] } | null)?.products;
         if (!products || products.length === 0) {
+          // Zero resultados → a Recova entra em fluxo. Fecha o modal de busca
+          // para não sobrepor o overlay (feedback da Gabrielly).
+          setOpen(false);
           setRecoveryTerm(query);
         }
       })
