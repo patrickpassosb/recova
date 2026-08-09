@@ -438,6 +438,14 @@ export default function SearchRecoveryOverlay({
       {
         onSuccess: (cartState) => {
           if (closedRef.current) return;
+          // Instrumentação (Fase C): clique em alternativa (CTA do card).
+          track({
+            event: "recova_product_clicked",
+            session_id: sessionRef.current ?? undefined,
+            interaction_type: "product_click",
+            product_id: product.id,
+            price: product.price,
+          });
           setMessages((prev) => [
             ...prev,
             {
@@ -653,6 +661,23 @@ export default function SearchRecoveryOverlay({
             key={i}
             className={`flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}
           >
+            {msg.role === "agent" && (
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="flex size-5 items-center justify-center rounded-full"
+                  style={{ backgroundColor: theme.colors.primary }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 12c0-4.4 3.6-8 8-8 2.2 0 4.2 0.9 5.7 2.3" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
+                    <path d="M20 12c0 4.4-3.6 8-8 8-2.2 0-4.2-0.9-5.7-2.3" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
+                    <path d="M12 4v8l4 4" stroke={theme.colors.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <span className="text-2xs font-semibold" style={{ color: theme.colors.muted }}>
+                  Assistente Recova
+                </span>
+              </div>
+            )}
             <div
               className={`max-w-[85%] whitespace-pre-line rounded-lg px-3 py-2 text-sm ${
                 msg.role === "user" ? "" : "shadow-sm"
@@ -796,7 +821,7 @@ export default function SearchRecoveryOverlay({
           <img
             src={theme.logo ?? recovaLogoDataUri}
             alt={theme.brandName}
-            className="h-3.5 w-auto"
+            className="h-4 w-auto"
           />
           <span className="font-semibold" style={{ color: theme.colors.text }}>
             {theme.brandName}

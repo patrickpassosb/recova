@@ -1,7 +1,7 @@
 import type { ProductListingPage } from "@decocms/apps-commerce/types";
 import { BreadcrumbJsonLd, PLPJsonLd } from "@decocms/blocks/hooks";
 import { mapProductToAnalyticsItem } from "@decocms/apps-commerce/utils/productToAnalyticsItem";
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, useEffect } from "react";
 import { useOffer } from "@decocms/apps-commerce/sdk/useOffer";
 import { useRouterState } from "@tanstack/react-router";
 import { useSendEvent } from "../../sdk/useSendEvent";
@@ -14,6 +14,28 @@ import SearchRecoveryOverlay from "./SearchRecoveryOverlay";
 import SearchResultGrid from "./SearchResultGrid";
 import SearchResultGridSkeleton from "./SearchResultGridSkeleton";
 import SearchSortBar from "./SearchSortBar";
+import { invoke } from "../../runtime";
+
+/**
+ * Emite um evento real de instrumentação (Fase C — dashboard 100% dados
+ * reais). Best-effort: nunca quebra o fluxo se falhar.
+ */
+function track(event: Record<string, unknown>): void {
+  invoke.site.loaders
+    .searchRecovery({ action: "track_event", event })
+    .catch(() => {
+      // instrumentação é best-effort
+    });
+}
+
+/** Hash simples de uma query (para o query_hash do schema). */
+function hashQuery(query: string): string {
+  let h = 0;
+  for (let i = 0; i < query.length; i++) {
+    h = (h * 31 + query.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(16);
+}
 
 export interface Layout {
   /**
@@ -91,6 +113,22 @@ function Result({
   ) {
     setRecoveryTerm(searchTerm);
   }
+
+  // Instrumentação (Fase C): busca realizada + zero results — alimenta o dashboard.
+  useEffect(() => {
+    if (!searchTerm) return;
+    track({
+      event: "search_performed",
+      query_hash: hashQuery(searchTerm),
+    });
+    if (isZeroResults) {
+      track({
+        event: "search_zero_results",
+        query_hash: hashQuery(searchTerm),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, isZeroResults]);
 
   const viewItemListEvent = useSendEvent({
     on: "view",
