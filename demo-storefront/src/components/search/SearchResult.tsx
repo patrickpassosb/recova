@@ -116,6 +116,7 @@ function Result({
       {recoveryTerm && (
         <SearchRecoveryOverlay
           term={recoveryTerm}
+          variant="inline"
           onClose={() => {
             dismissedTermsRef.current.add(recoveryTerm);
             setRecoveryTerm(null);

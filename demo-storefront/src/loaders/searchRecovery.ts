@@ -12,6 +12,8 @@
 export interface RecoveryProduct {
   id: string;
   title: string;
+  /** Handle do produto — para linkar à página do produto (/products/:slug). */
+  handle?: string | null;
   price: number;
   image: string | null;
   score: number;

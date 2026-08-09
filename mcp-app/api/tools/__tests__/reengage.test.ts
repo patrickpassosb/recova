@@ -31,7 +31,7 @@ describe("reengage tool", () => {
       runtimeContext: {} as never,
     }) as Promise<{
       message: string;
-      attempt: 1 | 2;
+      attempt: number;
       exhausted: boolean;
     }>;
   }
@@ -63,16 +63,29 @@ describe("reengage tool", () => {
     expect(first.message).not.toBe(second.message);
   });
 
-  it("marks exhausted=true on the third call and stops sending", async () => {
+  it("never exhausts — the chat stays open indefinitely (decisão 09/08)", async () => {
     const session_id = await startSession();
-    await run(session_id); // 1
-    await run(session_id); // 2
-    const third = await run(session_id); // exhausted
-    expect(third.exhausted).toBe(true);
-    expect(third.attempt).toBe(2);
-    // Attempts must not exceed 2
+    // Muitas tentativas seguidas: o chat NUNCA encerra sozinho.
+    for (let i = 0; i < 10; i++) {
+      const res = await run(session_id);
+      expect(res.exhausted).toBe(false);
+      expect(res.attempt).toBe(i + 1);
+    }
     const { getSession } = await import("../../lib/sessions.ts");
-    expect(getSession(session_id)?.reengageAttempts).toBe(2);
+    expect(getSession(session_id)?.reengageAttempts).toBe(10);
+  });
+
+  it("cycles messages so it never sounds repetitive", async () => {
+    const session_id = await startSession();
+    const seen = new Set<string>();
+    for (let i = 0; i < 6; i++) {
+      const res = await run(session_id);
+      seen.add(res.message);
+    }
+    // Com 3 mensagens ciclando, 6 tentativas devem repetir (não 6 únicas),
+    // mas nunca encerrar.
+    expect(seen.size).toBeLessThanOrEqual(3);
+    expect(seen.size).toBeGreaterThan(0);
   });
 
   it("throws for an unknown session", async () => {

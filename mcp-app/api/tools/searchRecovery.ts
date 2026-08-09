@@ -18,6 +18,7 @@ import {
   deriveCatalogCategories,
   extractMaxPrice,
   fetchCatalog,
+  findCategoryForTerms,
   isStopword,
   lexicalSearch,
   normalize,
@@ -60,6 +61,7 @@ export const searchRecoveryOutputSchema = z.object({
       z.object({
         id: z.string(),
         title: z.string(),
+        handle: z.string().optional().describe("Handle do produto — para linkar à página do produto"),
         price: z.number(),
         image: z.string().nullable(),
         score: z.number(),
@@ -334,21 +336,23 @@ export const searchRecoveryTool = (_env: Env) =>
       }
 
       const products = pickProducts(chosen, activeSession.suggestedProductIds);
-      // Garante o mínimo de 3 no contrato, completando com bestsellers quando
-      // a busca (ex.: filtrada por preço) não chega a 3 resultados.
-      // O padding respeita o teto de preço (não estoura o orçamento do cliente)
-      // e NUNCA repete produtos já sugeridos na sessão (loop não mostra 2x o
-      // mesmo produto ao cliente).
+      // Decisão da reunião 09/08: NÃO encher linguiça. Se a busca só achou 1
+      // produto relevante, mostra 1 — não completa com bestsellers aleatórios
+      // só para bater o mínimo. O padding abaixo só completa com produtos da
+      // MESMA família do pedido (relevantes), nunca com bestsellers soltos.
       let finalProducts = products;
       let padded = false;
       if (finalProducts.length < 3) {
         const seen = new Set(finalProducts.map((p) => p.product.id));
         for (const id of activeSession.suggestedProductIds) seen.add(id);
-        const pad = popularProducts(catalog, 8)
-          .filter((p) => !seen.has(p.id))
-          .filter((p) => maxPrice === undefined || p.price <= maxPrice)
-          .map((p) => ({
-            product: p,
+        const cat = findCategoryForTerms(categories, intent.terms);
+        const padTerms = cat?.terms ?? intent.terms;
+        const pad = lexicalSearch(catalog, padTerms)
+          .filter((r) => !seen.has(r.product.id))
+          .filter((r) => maxPrice === undefined || r.product.price <= maxPrice)
+          .slice(0, 5 - finalProducts.length)
+          .map((r) => ({
+            product: r.product,
             score: 0,
             matchType: "PARTIAL" as const,
             rawHits: 0,

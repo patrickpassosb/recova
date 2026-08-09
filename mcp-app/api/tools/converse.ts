@@ -28,7 +28,6 @@ import {
   getSession,
   touchSession,
 } from "../lib/sessions.ts";
-import { SEARCH_RECOVERY_RESOURCE_URI } from "./searchRecovery.ts";
 
 export const CONVERSE_RESOURCE_URI = "ui://mcp-app/converse";
 
@@ -51,6 +50,7 @@ export const converseOutputSchema = z.object({
       z.object({
         id: z.string(),
         title: z.string(),
+        handle: z.string().optional().describe("Handle do produto — para linkar à página do produto"),
         price: z.number(),
         image: z.string().nullable(),
         score: z.number(),

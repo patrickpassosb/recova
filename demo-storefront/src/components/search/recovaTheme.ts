@@ -51,11 +51,14 @@ export interface RecovaTheme {
     thinking: string;
     inputPlaceholder: string;
     send: string;
-    buy: string;
+    buy: string; // "Comprar" (vai direto ao checkout)
+    addToCart: string; // "Adicionar ao carrinho"
     closeAria: string;
     dialogAria: string;
     recoveryPrefix: string; // "Recuperando resultados para"
     poweredBy?: string; // "Powered by Recova" (opcional, free tier)
+    /** URL da landing page da Recova (para o "Powered by Recova" clicável). */
+    poweredByUrl?: string;
   };
   /** Pergunta de refinamento + chips (1 pergunta, junto com os produtos). */
   refinement?: {
@@ -93,7 +96,7 @@ export const recovaDefaultTheme: RecovaTheme = {
     agentIntro: "Entendi.",
     buySuccess: "Ótima escolha! Adicionei {product} ({price}) ao carrinho.",
     buySuccessTitle: "Compra concluída!",
-    buySuccessSubtitle: "Venda recuperada pela Recova",
+    buySuccessSubtitle: "Adicionado ao carrinho",
     failedTitle: "Sem conversão",
     failedSubtitle: "Cliente não adicionou nada ao carrinho",
     failedBody:
@@ -103,9 +106,11 @@ export const recovaDefaultTheme: RecovaTheme = {
     inputPlaceholder: "Responda ao assistente...",
     send: "Enviar",
     buy: "Comprar",
+    addToCart: "Adicionar ao carrinho",
     closeAria: "Fechar",
     dialogAria: "Recova — assistente de busca",
-    recoveryPrefix: "Recuperando resultados para",
+    recoveryPrefix: "Resultados para",
+    poweredByUrl: "https://recova.app",
   },
   showRecovaBranding: true,
 };

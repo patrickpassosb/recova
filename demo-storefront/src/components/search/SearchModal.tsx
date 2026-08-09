@@ -145,6 +145,10 @@ export default function SearchModal({
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // Timer de 10s: se não houver recomendações ao digitar, o agente aparece
+  // inline (embaixo da barra de busca) — decisão da reunião 09/08.
+  const inlineRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [inlineRecoveryTerm, setInlineRecoveryTerm] = useState<string | null>(null);
 
   // Open with Cmd+K / Ctrl+K, close with Escape.
   useEffect(() => {
@@ -167,6 +171,9 @@ export default function SearchModal({
       inputRef.current?.focus();
       return () => triggerRef.current?.focus();
     }
+    // Ao fechar, limpa o timer de agente inline e o estado.
+    if (inlineRecoveryTimerRef.current) clearTimeout(inlineRecoveryTimerRef.current);
+    setInlineRecoveryTerm(null);
   }, [open]);
 
   // The overlay is a plain div, so the `dialog[open]` / `.drawer-toggle:checked`
@@ -220,17 +227,36 @@ export default function SearchModal({
     if (!open || !query) {
       setProducts([]);
       setLoading(false);
+      if (inlineRecoveryTimerRef.current) clearTimeout(inlineRecoveryTimerRef.current);
+      setInlineRecoveryTerm(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
+    // Timer de 10s: se não houver recomendações ao digitar, o agente aparece
+    // inline (embaixo da barra de busca) — decisão da reunião 09/08.
+    if (inlineRecoveryTimerRef.current) clearTimeout(inlineRecoveryTimerRef.current);
+    inlineRecoveryTimerRef.current = setTimeout(() => {
+      if (cancelled || !open) return;
+      // Só aciona se ainda não há sugestões e o termo não foi dispensado.
+      if (!dismissedTermsRef.current.has(query)) {
+        setInlineRecoveryTerm(query);
+      }
+    }, 10_000);
     const timer = setTimeout(async () => {
       try {
         const result = (await invoke.site.loaders.searchSuggestions({
           query,
           count: SUGGESTION_COUNT,
         })) as { products?: Product[] } | null;
-        if (!cancelled) setProducts(result?.products ?? []);
+        if (!cancelled) {
+          setProducts(result?.products ?? []);
+          // Se apareceram sugestões, cancela o agente inline.
+          if ((result?.products?.length ?? 0) > 0) {
+            if (inlineRecoveryTimerRef.current) clearTimeout(inlineRecoveryTimerRef.current);
+            setInlineRecoveryTerm(null);
+          }
+        }
       } catch {
         if (!cancelled) setProducts([]);
       } finally {
@@ -347,6 +373,21 @@ export default function SearchModal({
             </span>
           )}
         </div>
+
+        {/* Agente inline: aparece embaixo da barra de busca após ~10s sem
+            recomendações (decisão da reunião 09/08). Não é pop-up. */}
+        {inlineRecoveryTerm && (
+          <div className="border-t pt-3" style={{ borderColor: "rgba(0,0,0,0.1)" }}>
+            <SearchRecoveryOverlay
+              term={inlineRecoveryTerm}
+              variant="inline"
+              onClose={() => {
+                dismissedTermsRef.current.add(inlineRecoveryTerm);
+                setInlineRecoveryTerm(null);
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

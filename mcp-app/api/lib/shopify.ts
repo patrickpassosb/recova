@@ -400,6 +400,7 @@ export function toProductOutput(p: ScoredProduct) {
   return {
     id: p.product.id,
     title: p.product.title,
+    handle: p.product.handle,
     price: p.product.price,
     image: p.product.image ?? null,
     score: p.score,

@@ -1,23 +1,22 @@
 /**
  * SearchRecoveryOverlay — o agente de recuperação de busca no storefront.
  *
- * Segue o fluxograma:
- * 1. Busca nativa retorna zero resultados → overlay abre automaticamente
- * 2. Agente entra como chat com 3+ produtos em <2s + 1 pergunta de refinamento
- *    com chips de resposta rápida (junto com os produtos, sem passo intermediário)
- * 3. Cliente comprou uma sugestão → ✅ SUCESSO (verde)
- * 4. Cliente responde (chip ou texto) → 3+ produtos + explicação + nova pergunta (loop)
- * 5. O chat fica aberto indefinidamente — o cliente pode demorar o tempo que
- *    quiser para responder; só fecha manualmente (✕)
+ * Segue o fluxograma + decisões da reunião 09/08:
+ * 1. Busca nativa retorna zero resultados → o agente entra (SÓ no Enter)
+ * 2. Agente entra como chat com produtos + 1 pergunta de refinamento com chips
+ * 3. Produtos são CLICÁVEIS (vão para a página do produto) e têm 2 botões:
+ *    "Comprar" (adiciona ao carrinho e vai ao checkout) e "Adicionar ao carrinho"
+ * 4. O chat NUNCA encerra sozinho — fica aberto enquanto a aba estiver aberta
+ * 5. Reengajamento: após 30s sem ação, envia nova mensagem + som de alerta
+ * 6. "Powered by Recova" é clicável → landing page
  *
  * White-label (estilo Tidio): o tema é injetado via `theme` prop. Free tier usa
- * o tema Recova padrão; planos pagos permitem customização total (logo, cores,
- * fontes, copy) sem qualquer menção à Recova.
+ * o tema Recova padrão; planos pagos permitem customização total.
  */
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "../../runtime";
-import { useAddToCart } from "../../platform/cart";
+import { useAddToCart, useCart } from "../../platform/cart";
 import type {
   RecoveryProduct,
   RecoveryResult,
@@ -36,6 +35,13 @@ export interface SearchRecoveryOverlayProps {
   onClose?: () => void;
   /** Tema white-label (opcional — default: Recova, free tier) */
   theme?: RecovaThemeConfig;
+  /**
+   * Variante de renderização:
+   * - "popup" (default): overlay fixo em tela cheia (usado no Enter / zero results).
+   * - "inline": renderizado em fluxo, embaixo da barra de busca (após ~10s sem
+   *   recomendações ao digitar) — decisão da reunião 09/08, não é pop-up.
+   */
+  variant?: "popup" | "inline";
 }
 
 type ChatMessage =
@@ -57,10 +63,45 @@ function formatPrice(price: number): string {
   return `R$ ${price.toFixed(2).replace(".", ",")}`;
 }
 
+/** URL da página do produto a partir do handle. */
+function productUrl(handle?: string | null): string | null {
+  if (!handle) return null;
+  return `/products/${handle}`;
+}
+
+/** Toca um som de alerta curto (Web Audio) para o reengajamento. */
+function playAlertSound() {
+  try {
+    const Ctx =
+      (window as unknown as { AudioContext?: typeof AudioContext })
+        .AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.45);
+    // Libera o contexto após o som
+    setTimeout(() => ctx.close().catch(() => {}), 600);
+  } catch {
+    // som é opcional — nunca quebra o fluxo
+  }
+}
+
 export default function SearchRecoveryOverlay({
   term,
   onClose,
   theme: themeConfig,
+  variant = "popup",
 }: SearchRecoveryOverlayProps) {
   const theme = resolveTheme(themeConfig);
   const cssVars = themeToCssVars(theme);
@@ -71,8 +112,12 @@ export default function SearchRecoveryOverlay({
   const sessionRef = useRef<string | null>(null);
   const closedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  // Carrinho real (Shopify via server fn) — "Comprar" agora adiciona de verdade.
+  // Carrinho real (Shopify via server fn) — "Comprar"/"Adicionar" adicionam de verdade.
   const addToCart = useAddToCart();
+  const { cart } = useCart();
+  // Timer de reengajamento (30s de inatividade → nova mensagem + som)
+  const reengageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   // Scrolla para a última mensagem
   useEffect(() => {
@@ -121,9 +166,51 @@ export default function SearchRecoveryOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [term]);
 
+  // Reengajamento: após 30s de inatividade, envia nova mensagem + som.
+  // O chat NUNCA encerra sozinho — continua enquanto a aba estiver aberta.
+  useEffect(() => {
+    if (flow.status !== "chat" || closedRef.current) return;
+
+    const schedule = () => {
+      if (reengageTimerRef.current) clearTimeout(reengageTimerRef.current);
+      reengageTimerRef.current = setTimeout(async () => {
+        if (closedRef.current || flow.status !== "chat") return;
+        const sessionId = sessionRef.current;
+        if (!sessionId) return;
+        try {
+          const result = (await invoke.site.loaders.searchRecovery({
+            session_id: sessionId,
+            action: "reengage",
+          })) as { message?: string } | null;
+          if (closedRef.current) return;
+          if (result?.message) {
+            playAlertSound();
+            setMessages((prev) => [
+              ...prev,
+              { role: "agent", text: result.message! },
+            ]);
+          }
+        } catch {
+          // reengajamento é best-effort — nunca quebra o chat
+        }
+        // agenda o próximo ciclo (30s)
+        schedule();
+      }, 30_000);
+    };
+
+    schedule();
+    return () => {
+      if (reengageTimerRef.current) clearTimeout(reengageTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow.status]);
+
   // Cliente comprou uma sugestão → adiciona ao carrinho REAL (Shopify).
-  // Só mostra o estado verde ✅ quando a mutation do carrinho confirma.
-  const handleBuy = (product: RecoveryProduct) => {
+  // "Comprar" adiciona e vai ao checkout; "Adicionar ao carrinho" só adiciona.
+  const handleAddToCart = (
+    product: RecoveryProduct,
+    goToCheckout: boolean,
+  ) => {
     setMessages((prev) => [
       ...prev,
       { role: "user", text: `Quero comprar: ${product.title}` },
@@ -142,7 +229,7 @@ export default function SearchRecoveryOverlay({
     addToCart.mutate(
       { merchandiseId: product.variant_id, quantity: 1 },
       {
-        onSuccess: () => {
+        onSuccess: (cartState) => {
           if (closedRef.current) return;
           setMessages((prev) => [
             ...prev,
@@ -151,6 +238,13 @@ export default function SearchRecoveryOverlay({
               text: `Ótima escolha! 🎉 Adicionei ${product.title} (${formatPrice(product.price)}) ao carrinho.`,
             },
           ]);
+          if (goToCheckout) {
+            const checkoutUrl = cartState?.checkoutUrl;
+            if (checkoutUrl) {
+              window.location.href = checkoutUrl;
+              return;
+            }
+          }
           setFlow({ status: "success" });
         },
         onError: () => {
@@ -216,11 +310,315 @@ export default function SearchRecoveryOverlay({
 
   const close = () => {
     closedRef.current = true;
+    if (reengageTimerRef.current) clearTimeout(reengageTimerRef.current);
     onClose?.();
   };
 
   const isSuccess = flow.status === "success";
 
+  // Conteúdo do diálogo (compartilhado entre popup e inline).
+  const dialog = (
+    <div
+      role="dialog"
+      aria-modal={variant === "popup"}
+      aria-label={theme.copy.dialogAria}
+      className={`relative flex w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl ${
+        variant === "inline" ? "max-w-full" : "mx-3 mb-3 max-w-md sm:mb-0"
+      } ${isSuccess ? "ring-2" : ""}`}
+      style={{
+        fontFamily: theme.fonts.body,
+        ...(isSuccess ? { boxShadow: `0 0 0 2px ${theme.colors.success}` } : {}),
+      }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{
+          backgroundColor: isSuccess ? theme.colors.success : theme.colors.headerBg,
+          color: theme.colors.headerText,
+        }}
+      >
+        <div className="flex items-center gap-2">
+          {theme.logo ? (
+            <img
+              src={theme.logo}
+              alt={theme.brandName}
+              className="h-8 w-auto"
+            />
+          ) : (
+            <span
+              className="flex size-8 items-center justify-center rounded-lg"
+              style={{ backgroundColor: theme.colors.primary }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 12c0-4.4 3.6-8 8-8 2.2 0 4.2 0.9 5.7 2.3" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+                <path d="M20 12c0 4.4-3.6 8-8 8-2.2 0-4.2-0.9-5.7-2.3" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+                <path d="M12 4v8l4 4" stroke={theme.colors.accent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="2" fill={theme.colors.accent} />
+              </svg>
+            </span>
+          )}
+          <div>
+            <p className="text-sm font-bold" style={{ fontFamily: theme.fonts.display }}>
+              {isSuccess ? theme.copy.buySuccessTitle : theme.brandName}
+            </p>
+            <p className="text-2xs opacity-80">
+              {isSuccess
+                ? theme.copy.buySuccessSubtitle
+                : `${theme.copy.recoveryPrefix} "${term}"`}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={close}
+          aria-label={theme.copy.closeAria}
+          className="flex size-8 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Corpo */}
+      <div
+        className="flex max-h-[50vh] min-h-40 flex-col gap-3 overflow-y-auto p-4"
+        style={{ backgroundColor: theme.colors.surface }}
+      >
+        {flow.status === "loading" && (
+          <div className="flex items-center gap-2 text-sm" style={{ color: theme.colors.muted }}>
+            <span className="loading loading-spinner loading-xs" />
+            {theme.copy.loading}
+          </div>
+        )}
+
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            className={`flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}
+          >
+            <div
+              className={`max-w-[85%] whitespace-pre-line rounded-lg px-3 py-2 text-sm ${
+                msg.role === "user" ? "" : "shadow-sm"
+              }`}
+              style={
+                msg.role === "user"
+                  ? { backgroundColor: theme.colors.headerBg, color: theme.colors.headerText }
+                  : { backgroundColor: theme.colors.cardBg, color: theme.colors.text }
+              }
+            >
+              {msg.text}
+            </div>
+
+            {msg.role === "agent" && msg.products && msg.products.length > 0 && (
+              <div className="flex w-full flex-col gap-2">
+                {/* Carrossel horizontal de produtos (decisão 09/08): arrastável,
+                    com scroll-snap. Não é lista vertical comprida. */}
+                <div
+                  className="flex gap-2 overflow-x-auto pb-1"
+                  style={{ scrollSnapType: "x mandatory" }}
+                >
+                  {msg.products.map((p) => {
+                    const url = productUrl(p.handle);
+                    return (
+                      <div
+                        key={p.id}
+                        className="flex w-40 shrink-0 flex-col gap-2 rounded-lg border p-2 shadow-sm"
+                        style={{
+                          backgroundColor: theme.colors.cardBg,
+                          borderColor: theme.colors.border,
+                          scrollSnapAlign: "start",
+                        }}
+                      >
+                        {url ? (
+                          <a href={url} aria-label={`Ver ${p.title}`}>
+                            {p.image ? (
+                              <img
+                                src={p.image}
+                                alt={p.title}
+                                className="h-24 w-full rounded-md object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="h-24 w-full rounded-md"
+                                style={{ backgroundColor: theme.colors.border }}
+                              />
+                            )}
+                          </a>
+                        ) : p.image ? (
+                          <img
+                            src={p.image}
+                            alt={p.title}
+                            className="h-24 w-full rounded-md object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="h-24 w-full rounded-md"
+                            style={{ backgroundColor: theme.colors.border }}
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          {url ? (
+                            <a
+                              href={url}
+                              className="block truncate text-sm font-medium hover:underline"
+                              style={{ color: theme.colors.text }}
+                            >
+                              {p.title}
+                            </a>
+                          ) : (
+                            <p className="truncate text-sm font-medium" style={{ color: theme.colors.text }}>
+                              {p.title}
+                            </p>
+                          )}
+                          <p className="text-xs" style={{ color: theme.colors.muted }}>
+                            {formatPrice(p.price)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(p, true)}
+                            disabled={isSuccess}
+                            className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-40"
+                            style={{ backgroundColor: theme.colors.primary }}
+                          >
+                            {theme.copy.buy}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(p, false)}
+                            disabled={isSuccess}
+                            className="rounded-md border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
+                            style={{
+                              borderColor: theme.colors.primary,
+                              color: theme.colors.primary,
+                            }}
+                          >
+                            {theme.copy.addToCart}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Chips de refinamento dinâmicos vindos do backend (última mensagem do agente) */}
+        {(() => {
+          const lastAgent = [...messages].reverse().find((m) => m.role === "agent");
+          const chips = lastAgent?.role === "agent" ? lastAgent.refinementOptions : undefined;
+          if (!chips || chips.length === 0 || isSuccess) return null;
+          return (
+            <div
+              className="flex flex-col gap-2 rounded-lg border p-3"
+              style={{
+                backgroundColor: theme.colors.cardBg,
+                borderColor: theme.colors.border,
+              }}
+            >
+              <p className="text-sm font-bold" style={{ color: theme.colors.text }}>
+                Continuar refinando:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {chips.map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => handleSend(chip)}
+                    disabled={thinking}
+                    className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
+                    style={{
+                      backgroundColor: theme.colors.primary,
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {thinking && (
+          <div className="flex items-center gap-2 text-sm" style={{ color: theme.colors.muted }}>
+            <span className="loading loading-spinner loading-xs" />
+            {theme.copy.thinking}
+          </div>
+        )}
+
+        {isSuccess && (
+          <div
+            className="rounded-lg p-3 text-sm"
+            style={{
+              backgroundColor: `${theme.colors.success}1A`,
+              color: theme.colors.success,
+            }}
+          >
+            Obrigado! Sua compra foi registrada.
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input (escondido no estado terminal) */}
+      {!isSuccess && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend();
+          }}
+          className="flex items-center gap-2 border-t bg-white p-3"
+          style={{ borderColor: theme.colors.border }}
+        >
+          <input
+            value={input}
+            onChange={(e) => setInput(e.currentTarget.value)}
+            placeholder={theme.copy.inputPlaceholder}
+            className="grow rounded-md border px-3 py-2 text-sm outline-none"
+            style={{
+              borderColor: theme.colors.border,
+              color: theme.colors.text,
+            }}
+            disabled={thinking || flow.status === "loading"}
+          />
+          <button
+            type="submit"
+            disabled={thinking || flow.status === "loading" || !input.trim()}
+            className="rounded-md px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-40"
+            style={{ backgroundColor: theme.colors.primary }}
+          >
+            {theme.copy.send}
+          </button>
+        </form>
+      )}
+
+      {/* Powered by Recova (free tier) — clicável → landing page */}
+      {theme.showRecovaBranding && (
+        <a
+          href={theme.copy.poweredByUrl ?? "https://recova.app"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1 border-t px-3 py-1.5 text-2xs hover:underline"
+          style={{ borderColor: theme.colors.border, color: theme.colors.muted }}
+        >
+          {theme.copy.poweredBy ?? "Powered by Recova"}
+        </a>
+      )}
+    </div>
+  );
+
+  // Variante inline: renderiza em fluxo (embaixo da barra de busca), sem
+  // portal nem backdrop — não é pop-up (decisão da reunião 09/08).
+  if (variant === "inline") {
+    return <div style={cssVars as React.CSSProperties}>{dialog}</div>;
+  }
+
+  // Variante popup (default): overlay fixo em tela cheia.
   return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center"
@@ -232,245 +630,7 @@ export default function SearchRecoveryOverlay({
         onClick={close}
         className="absolute inset-0 cursor-default bg-ink/40 backdrop-blur-sm"
       />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={theme.copy.dialogAria}
-        className={`relative mx-3 mb-3 flex w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:mb-0 ${
-          isSuccess ? "ring-2" : ""
-        }`}
-        style={{
-          fontFamily: theme.fonts.body,
-          ...(isSuccess ? { boxShadow: `0 0 0 2px ${theme.colors.success}` } : {}),
-        }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-4 py-3"
-          style={{
-            backgroundColor: isSuccess ? theme.colors.success : theme.colors.headerBg,
-            color: theme.colors.headerText,
-          }}
-        >
-          <div className="flex items-center gap-2">
-            {theme.logo ? (
-              <img
-                src={theme.logo}
-                alt={theme.brandName}
-                className="h-8 w-auto"
-              />
-            ) : (
-              <span
-                className="flex size-8 items-center justify-center rounded-lg"
-                style={{ backgroundColor: theme.colors.primary }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M4 12c0-4.4 3.6-8 8-8 2.2 0 4.2 0.9 5.7 2.3" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M20 12c0 4.4-3.6 8-8 8-2.2 0-4.2-0.9-5.7-2.3" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M12 4v8l4 4" stroke={theme.colors.accent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx="12" cy="12" r="2" fill={theme.colors.accent} />
-                </svg>
-              </span>
-            )}
-            <div>
-              <p className="text-sm font-bold" style={{ fontFamily: theme.fonts.display }}>
-                {isSuccess ? theme.copy.buySuccessTitle : theme.brandName}
-              </p>
-              <p className="text-2xs opacity-80">
-                {isSuccess
-                  ? theme.copy.buySuccessSubtitle
-                  : `${theme.copy.recoveryPrefix} "${term}"`}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label={theme.copy.closeAria}
-            className="flex size-8 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Corpo */}
-        <div
-          className="flex max-h-[50vh] min-h-40 flex-col gap-3 overflow-y-auto p-4"
-          style={{ backgroundColor: theme.colors.surface }}
-        >
-          {flow.status === "loading" && (
-            <div className="flex items-center gap-2 text-sm" style={{ color: theme.colors.muted }}>
-              <span className="loading loading-spinner loading-xs" />
-              {theme.copy.loading}
-            </div>
-          )}
-
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}
-            >
-              <div
-                className={`max-w-[85%] whitespace-pre-line rounded-lg px-3 py-2 text-sm ${
-                  msg.role === "user" ? "" : "shadow-sm"
-                }`}
-                style={
-                  msg.role === "user"
-                    ? { backgroundColor: theme.colors.headerBg, color: theme.colors.headerText }
-                    : { backgroundColor: theme.colors.cardBg, color: theme.colors.text }
-                }
-              >
-                {msg.text}
-              </div>
-
-              {msg.role === "agent" && msg.products && msg.products.length > 0 && (
-                <div className="flex w-full flex-col gap-2">
-                  {msg.products.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center gap-3 rounded-lg border p-2 shadow-sm"
-                      style={{
-                        backgroundColor: theme.colors.cardBg,
-                        borderColor: theme.colors.border,
-                      }}
-                    >
-                      {p.image ? (
-                        <img
-                          src={p.image}
-                          alt={p.title}
-                          className="size-12 shrink-0 rounded-md object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="size-12 shrink-0 rounded-md"
-                          style={{ backgroundColor: theme.colors.border }}
-                        />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium" style={{ color: theme.colors.text }}>
-                          {p.title}
-                        </p>
-                        <p className="text-xs" style={{ color: theme.colors.muted }}>
-                          {formatPrice(p.price)}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleBuy(p)}
-                        disabled={isSuccess}
-                        className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-40"
-                        style={{ backgroundColor: theme.colors.primary }}
-                      >
-                        {theme.copy.buy}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Chips de refinamento dinâmicos vindos do backend (última mensagem do agente) */}
-          {(() => {
-            const lastAgent = [...messages].reverse().find((m) => m.role === "agent");
-            const chips = lastAgent?.role === "agent" ? lastAgent.refinementOptions : undefined;
-            if (!chips || chips.length === 0 || isSuccess) return null;
-            return (
-              <div
-                className="flex flex-col gap-2 rounded-lg border p-3"
-                style={{
-                  backgroundColor: theme.colors.cardBg,
-                  borderColor: theme.colors.border,
-                }}
-              >
-                <p className="text-sm font-bold" style={{ color: theme.colors.text }}>
-                  Continuar refinando:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {chips.map((chip) => (
-                    <button
-                      key={chip}
-                      type="button"
-                      onClick={() => handleSend(chip)}
-                      disabled={thinking}
-                      className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
-                      style={{
-                        backgroundColor: theme.colors.primary,
-                        color: "#FFFFFF",
-                      }}
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {thinking && (
-            <div className="flex items-center gap-2 text-sm" style={{ color: theme.colors.muted }}>
-              <span className="loading loading-spinner loading-xs" />
-              {theme.copy.thinking}
-            </div>
-          )}
-
-          {isSuccess && (
-            <div
-              className="rounded-lg p-3 text-sm"
-              style={{
-                backgroundColor: `${theme.colors.success}1A`,
-                color: theme.colors.success,
-              }}
-            >
-              Obrigado! Sua compra foi registrada.
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input (escondido no estado terminal) */}
-        {!isSuccess && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex items-center gap-2 border-t bg-white p-3"
-            style={{ borderColor: theme.colors.border }}
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.currentTarget.value)}
-              placeholder={theme.copy.inputPlaceholder}
-              className="grow rounded-md border px-3 py-2 text-sm outline-none"
-              style={{
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              }}
-              disabled={thinking || flow.status === "loading"}
-            />
-            <button
-              type="submit"
-              disabled={thinking || flow.status === "loading" || !input.trim()}
-              className="rounded-md px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-40"
-              style={{ backgroundColor: theme.colors.primary }}
-            >
-              {theme.copy.send}
-            </button>
-          </form>
-        )}
-
-        {/* Powered by Recova (free tier) */}
-        {theme.showRecovaBranding && (
-          <div
-            className="flex items-center justify-center gap-1 border-t px-3 py-1.5 text-2xs"
-            style={{ borderColor: theme.colors.border, color: theme.colors.muted }}
-          >
-            {theme.copy.poweredBy ?? "Powered by Recova"}
-          </div>
-        )}
-      </div>
+      {dialog}
     </div>,
     document.body,
   );
