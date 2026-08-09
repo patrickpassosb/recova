@@ -31,11 +31,13 @@ describe("extractJson", () => {
 });
 
 describe("chat (network)", () => {
-  // These tests exercise the real HTTP path with the configured OLLAMA_API_KEY.
-  // They are skipped automatically when no key is available so CI stays green
-  // without secrets. When mcp-app/.env has a key, they run for real.
-
-  const hasKey = (process.env.OLLAMA_API_KEY ?? "").length > 0;
+  // These tests exercise the real HTTP path with the configured LLM key
+  // (OLLAMA_API_KEY ou OPENAI_API_KEY). They are skipped automatically when
+  // no key is available so CI stays green without secrets. When mcp-app/.env
+  // has either key, they run for real.
+  const hasKey =
+    (process.env.OLLAMA_API_KEY ?? "").length > 0 ||
+    (process.env.OPENAI_API_KEY ?? "").length > 0;
 
   const itIfKey = (name: string, fn: () => Promise<void>) =>
     (hasKey ? it : it.skipIf(!hasKey))(name, fn);

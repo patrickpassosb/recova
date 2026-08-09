@@ -165,6 +165,15 @@ describe("search_recovery tool", () => {
       const seen = new Set(s!.suggestedProductIds);
       expect(seen.size).toBe(s!.suggestedProductIds.length); // no dupes
     });
+
+    it("does not share product ids between consecutive responses", async () => {
+      const first = await run({ query: "tenis" });
+      const second = await run({ query: "tenis", session_id: first.session_id });
+      const firstIds = new Set(first.products.map((p) => p.id));
+      for (const p of second.products) {
+        expect(firstIds.has(p.id)).toBe(false);
+      }
+    });
   });
 
   describe("input validation", () => {

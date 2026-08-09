@@ -6,6 +6,7 @@ import {
   addMessage,
   addSuggestedProducts,
   pruneSessions,
+  deleteSession,
   type Session,
 } from "../sessions.ts";
 
@@ -18,7 +19,9 @@ describe("sessions", () => {
   });
 
   afterEach(() => {
-    for (const id of createdIds) getSession(id); // touch/expire handling no-op
+    // Remove every session created in this test so none leak into the next
+    // case (the module keeps a global Map across tests).
+    for (const id of createdIds) deleteSession(id);
   });
 
   function makeSession(query = "tenis"): Session {

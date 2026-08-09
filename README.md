@@ -16,9 +16,9 @@ A Recova é uma camada de IA para e-commerce que é acionada quando a busca da l
 ## O impacto em números (bottom-up)
 
 > **Loja de alto volume:** 40 mil buscas/dia · 12% zero-results = **4.800 buscas perdidas/dia** · conversão base 3,1% · AOV R$ 120
-> = **≈ R$ 4,3 milhões/ano de receita em risco.**
+> = **≈ R$ 6,5 milhões/ano de receita em risco.**
 >
-> A Recova recuperando **só 10%** disso = **+R$ 430 mil/ano**, a custo de **< R$ 0,05 por conversa**.
+> A Recova recuperando **só 10%** disso = **+R$ 652 mil/ano**, a custo de **< R$ 0,05 por conversa** (≈ R$ 8.760/ano).
 
 A conta inteira (buscas → zero-results → conversão × AOV → receita recuperada) está no final do README e na apresentação — o júri não discute número com a conta na mesa.
 
@@ -112,20 +112,22 @@ bun run dev          # storefront com overlay conversacional
 
 ## A conta da receita recuperada (bottom-up)
 
-Premissas de uma loja de alto volume (todas citáveis, todas conservadoras):
+Premissas de uma loja de alto volume. Cada linha tem fonte real (org + URL + ano) ou está marcada como **premissa interna** com justificativa.
 
 | Linha | Valor | Fonte |
 |---|---|---|
-| Buscas internas/dia | 40.000 | loja alto volume (referência mercado) |
-| Taxa de zero-results | 12% | SearchMind 12,5% global; LATAM lidera |
-| Buscas perdidas/dia | 4.800 | 40.000 × 12% |
-| Conversão base (busca) | 3,1% | benchmark indústria |
-| AOV | R$ 120 | tíquete médio SMB brasileiro |
-| Receita em risco/ano | **≈ R$ 4,3 M** | 4.800 × 3,1% × R$ 120 × 365 |
+| Buscas internas/dia | 40.000 | **Premissa interna** — loja de alto volume (referência: Doofinder processa 175M buscas/mês em 10.000+ lojas ≈ 583 buscas/dia/loja média; 40k/dia é uma loja grande, não a média) |
+| Taxa de zero-results | 12% | SearchMind/Barilliance (citado via Doofinder/Algolia) + Bloomreach 12–20% — https://www.bloomreach.com/en/blog/how-to-fix-zero-search-results-in-ecommerce (2026) |
+| Buscas perdidas/dia | 4.800 | 40.000 × 12% (cálculo) |
+| Conversão base (busca) | 3,1% | Rep AI 2025, citado via Alhena — https://alhena.ai/blog/alhena-ai-vs-dynamic-yield/ (2025-2026): shoppers que engajam com IA convertem 12,3% vs 3,1% |
+| AOV | R$ 120 | **Premissa interna conservadora** — SMB brasileiro. Dado real de mercado: ABComm 2026 ticket médio R$ 564,96 (https://edrone.me/br/blog/dados-ecommerce-brasil) e Nuvemshop R$ 539 (https://www.nuvemshop.com.br/blog/dados-ecommerce/). Usamos R$ 120 como premissa SMB conservadora (loja menor que a média nacional) |
+| Receita em risco/ano | **≈ R$ 6,5 M** | 4.800 × 3,1% × R$ 120 × 365 |
 | Taxa de recuperação da Recova | 10% | conservador; target do MVP 30%+ |
-| **Receita recuperada/ano** | **≈ R$ 430 mil** | 4,3 M × 10% |
+| **Receita recuperada/ano** | **≈ R$ 652 mil** | 6,5 M × 10% |
 | Custo por conversa | **< R$ 0,05** | DeepSeek V4 Flash, cache, max_tokens baixo |
-| Custo anual ≈ | R$ 2.900 | 4.800 × 365 × 10% × R$ 0,05 |
+| Custo anual ≈ | R$ 8.760 | 4.800 × 365 × 10% × R$ 0,05 |
+
+> **Nota de fontes:** os números de volume de busca (40k/dia) e AOV (R$ 120) são **premissas internas** — não há fonte pública rastreável para uma loja específica de alto volume. O ticket médio real do e-commerce brasileiro (ABComm R$ 564,96 / Nuvemshop R$ 539) é maior; usamos R$ 120 como premissa SMB conservadora para não inflar a conta. A taxa de zero-results (12%) e a conversão base (3,1%) têm fonte citável.
 
 Mesmo recuperando **1 em cada 10** buscas perdidas e com custo de centavos por conversa, o ROI é de **centenas de milhares de reais/ano** — sem trocar a busca, sem dev, sem custo de adoção.
 

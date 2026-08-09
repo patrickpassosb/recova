@@ -87,6 +87,32 @@ describe("converse tool", () => {
       expect(second.session_id).toBe(first.session_id);
       expect(second.products.length).toBeGreaterThanOrEqual(3);
     });
+
+    it("does not repeat product ids across 3 consecutive iterations", async () => {
+      // Sem sort_by_price: o filtro de novidade (não repetir produtos já
+      // sugeridos) se aplica. Com sort_by_price o converse re-emfatiza itens
+      // já vistos por design (re-ranqueamento), então não testamos no-repeat aí.
+      stubNetwork({
+        llm: {
+          content: JSON.stringify({
+            terms: ["shoes", "canvas shoes"],
+            max_price: null,
+            sort_by_price: null,
+            refinement_options: ["Casual", "Esportivo"],
+          }),
+        },
+      });
+      const session_id = await startSession("tenis");
+      const seen = new Set<string>();
+      for (let i = 0; i < 3; i++) {
+        const res = await run(session_id, `refinamento ${i}`);
+        expect(res.products.length).toBeGreaterThanOrEqual(3);
+        for (const p of res.products) {
+          expect(seen.has(p.id)).toBe(false);
+          seen.add(p.id);
+        }
+      }
+    });
   });
 
   describe("fallback (LLM unavailable)", () => {

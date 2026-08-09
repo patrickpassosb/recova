@@ -79,3 +79,11 @@ export function pruneSessions(): void {
     if (now - session.lastActivityAt > SESSIONS_TTL_MS) sessions.delete(id);
   }
 }
+
+/**
+ * Remove uma sessão do Map (usado em testes para não vazar estado entre
+ * casos). Não é usado em produção — apenas para isolamento de testes.
+ */
+export function deleteSession(id: string): void {
+  sessions.delete(id);
+}

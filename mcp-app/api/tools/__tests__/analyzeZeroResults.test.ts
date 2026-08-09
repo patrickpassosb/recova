@@ -111,5 +111,15 @@ describe("analyze_zero_results tool", () => {
         res.report[0].cause,
       );
     });
+
+    it("applies the LLM suggested_fix for the fixture term", async () => {
+      const res = await run([{ term: "bicicleta", volume: 10 }]);
+      // The stubbed LLM returns suggested_fix "Adicionar ao catálogo" for
+      // "bicicleta". Assert BOTH cause and suggested_fix so the test fails
+      // if the LLM refinement is ignored (regression guard).
+      expect(res.report[0].term).toBe("bicicleta");
+      expect(res.report[0].cause).toBe("nao_catalogado");
+      expect(res.report[0].suggested_fix).toBe("Adicionar ao catálogo");
+    });
   });
 });

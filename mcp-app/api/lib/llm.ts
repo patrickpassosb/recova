@@ -34,7 +34,12 @@ const LLM_URL = process.env.OLLAMA_API_KEY
   : `${(process.env.OPENAI_BASE_URL || OPENAI_DEFAULT_URL).replace(/\/+$/, "")}/chat/completions`;
 const LLM_MODEL =
   process.env.OLLAMA_API_KEY ? OLLAMA_MODEL : (process.env.OPENAI_MODEL || "gpt-4o-mini");
-const LLM_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS) || 3000;
+const LLM_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.LLM_TIMEOUT_MS);
+  // Rejeita valores negativos, NaN, Infinity e overflow: usa fallback 3000
+  // se o valor não for um número finito e positivo.
+  return Number.isFinite(raw) && raw > 0 ? raw : 3000;
+})();
 
 export class LlmError extends Error {}
 
