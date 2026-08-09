@@ -202,11 +202,11 @@ export function expandTerms(terms: string[]): string[] {
   return [...out];
 }
 
-/** Extrai um teto de preço de uma query em PT ("até 300", "até R$ 300"). */
+/** Extrai um teto de preço de uma query em PT ("até 300", "até R$ 300", "até 5"). */
 export function extractMaxPrice(query: string): number | undefined {
-  const m = query.match(/at[eé]s?\s*(?:r\$\s*)?(\d{2,6})/i);
+  const m = query.match(/at[eé]s?\s*(?:r\$\s*)?(\d{1,6})/i);
   if (m) return Number(m[1]);
-  const m2 = query.match(/(?:r\$\s*)?(\d{2,6})\s*reais/i);
+  const m2 = query.match(/(?:r\$\s*)?(\d{1,6})\s*reais/i);
   if (m2) return Number(m2[1]);
   return undefined;
 }

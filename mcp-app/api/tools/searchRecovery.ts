@@ -41,6 +41,7 @@ export const searchRecoveryInputSchema = z.object({
     .string()
     .min(1)
     .max(200)
+    .refine((q) => q.trim().length > 0, { message: "Query não pode ser vazia" })
     .describe("Termo livre digitado pelo cliente na busca (pode ter typos, preço, categoria)"),
   session_id: z
     .string()
@@ -278,8 +279,10 @@ export const searchRecoveryTool = (_env: Env) =>
         explanation = buildLowConfidenceExplanation(query);
         followUp = buildFollowUp(chosen);
       } else if (results.length === 0) {
-        // Nada no catálogo → recupera com bestsellers
-        const bestsellers = popularProducts(catalog, 5);
+        // Nada no catálogo → recupera com bestsellers (respeitando o teto de
+        // preço, se houver — não estoura o orçamento do cliente).
+        const bestsellers = popularProducts(catalog, 5)
+          .filter((p) => maxPrice === undefined || p.price <= maxPrice);
         chosen = bestsellers.map((p) => ({
           product: p,
           score: 0,
@@ -299,11 +302,14 @@ export const searchRecoveryTool = (_env: Env) =>
       const products = pickProducts(chosen, activeSession.suggestedProductIds);
       // Garante o mínimo de 3 no contrato, completando com bestsellers quando
       // a busca (ex.: filtrada por preço) não chega a 3 resultados.
+      // O padding respeita o teto de preço (não estoura o orçamento do cliente).
       let finalProducts = products;
+      let padded = false;
       if (finalProducts.length < 3) {
         const seen = new Set(finalProducts.map((p) => p.product.id));
         const pad = popularProducts(catalog, 5)
           .filter((p) => !seen.has(p.id))
+          .filter((p) => maxPrice === undefined || p.price <= maxPrice)
           .map((p) => ({
             product: p,
             score: 0,
@@ -313,6 +319,12 @@ export const searchRecoveryTool = (_env: Env) =>
             rawCoverage: 0,
           }));
         finalProducts = [...finalProducts, ...pad].slice(0, 5);
+        padded = pad.length > 0;
+      }
+      // Se houve padding, a explicação precisa refletir o retorno real
+      // (senão diz "Encontrei: X, Y" mas devolve 5 produtos).
+      if (padded && !lowConfidence && results.length > 0) {
+        explanation = buildExplanation(query, finalProducts, intent);
       }
       addSuggestedProducts(
         activeSession,

@@ -36,6 +36,7 @@ export const converseInputSchema = z.object({
     .string()
     .min(1)
     .max(500)
+    .refine((r) => r.trim().length > 0, { message: "Resposta não pode ser vazia" })
     .describe("Resposta livre do cliente à pergunta do agente"),
 });
 
@@ -219,11 +220,13 @@ export const converseTool = (_env: Env) =>
       const pool = fresh.length >= 3 ? fresh : results;
       let products = pool.slice(0, 5);
       // Garante o mínimo de 3 no contrato, completando com bestsellers quando
-      // o refinamento não chega a 3 resultados.
+      // o refinamento não chega a 3 resultados. O padding respeita o teto de
+      // preço (não estoura o orçamento do cliente).
       if (products.length < 3) {
         const seen = new Set(products.map((p) => p.product.id));
         const pad = popularProducts(catalog, 5)
           .filter((p) => !seen.has(p.id))
+          .filter((p) => maxPrice === undefined || p.price <= maxPrice)
           .map((p) => ({
             product: p,
             score: 0,
