@@ -12,6 +12,7 @@ import SearchRecoveryPage from "./tools/search-recovery/index.tsx";
 import ConversePage from "./tools/converse/index.tsx";
 import ReengagePage from "./tools/reengage/index.tsx";
 import AnalyzeZeroResultsPage from "./tools/analyze-zero-results/index.tsx";
+import DashboardPage from "./tools/dashboard/index.tsx";
 
 const TOOL_PAGES: Record<string, React.ComponentType> = {
 	hello_world: HelloPage,
@@ -19,6 +20,7 @@ const TOOL_PAGES: Record<string, React.ComponentType> = {
 	converse: ConversePage,
 	reengage: ReengagePage,
 	analyze_zero_results: AnalyzeZeroResultsPage,
+	dashboard: DashboardPage,
 };
 
 function ToolRouter() {

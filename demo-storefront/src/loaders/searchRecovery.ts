@@ -47,6 +47,18 @@ export interface AnalyzeResult {
   summary: string;
 }
 
+export interface DashboardResult {
+  totals: Record<string, number>;
+  metrics: Record<string, number>;
+  recent: Array<Record<string, unknown>>;
+}
+
+export interface TrackEventResult {
+  ok: boolean;
+  event: string;
+  timestamp: string;
+}
+
 const MCP_URL = "http://localhost:3001/api/mcp";
 
 async function callTool<T>(name: string, arguments_: Record<string, unknown>): Promise<T> {
@@ -103,8 +115,16 @@ export interface Props {
   session_id?: string;
   /** Resposta do cliente (para converse) */
   user_response?: string;
-  /** Ação: search_recovery | converse | reengage | analyze */
-  action?: "search_recovery" | "converse" | "reengage" | "analyze";
+  /** Ação: search_recovery | converse | reengage | analyze | dashboard | track_event */
+  action?:
+    | "search_recovery"
+    | "converse"
+    | "reengage"
+    | "analyze"
+    | "dashboard"
+    | "track_event";
+  /** Payload do evento (para track_event) */
+  event?: Record<string, unknown>;
 }
 
 export default async function searchRecoveryLoader({
@@ -112,7 +132,10 @@ export default async function searchRecoveryLoader({
   session_id,
   user_response,
   action = "search_recovery",
-}: Props): Promise<RecoveryResult | ReengageResult | AnalyzeResult | null> {
+  event,
+}: Props): Promise<
+  RecoveryResult | ReengageResult | AnalyzeResult | DashboardResult | TrackEventResult | null
+> {
   if (!query && action === "search_recovery") return null;
 
   try {
@@ -128,6 +151,11 @@ export default async function searchRecoveryLoader({
         return await callTool<ReengageResult>("reengage", { session_id });
       case "analyze":
         return await callTool<AnalyzeResult>("analyze_zero_results", {});
+      case "dashboard":
+        return await callTool<DashboardResult>("dashboard", {});
+      case "track_event":
+        if (!event) return null;
+        return await callTool<TrackEventResult>("track_event", event);
       case "search_recovery":
       default:
         return await callTool<RecoveryResult>("search_recovery", { query });

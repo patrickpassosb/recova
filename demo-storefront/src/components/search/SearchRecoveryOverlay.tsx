@@ -99,6 +99,28 @@ function playAlertSound() {
 }
 
 /**
+ * Emite um evento real de instrumentação (Fase C — dashboard 100% dados
+ * reais). Chama o loader com action "track_event", que faz proxy para a tool
+ * MCP track_event. Best-effort: nunca quebra o fluxo se falhar.
+ */
+function track(event: Record<string, unknown>): void {
+  invoke.site.loaders
+    .searchRecovery({ action: "track_event", event })
+    .catch(() => {
+      // instrumentação é best-effort — não quebra o overlay
+    });
+}
+
+/** Hash simples de uma query (para o query_hash do schema). */
+function hashQuery(query: string): string {
+  let h = 0;
+  for (let i = 0; i < query.length; i++) {
+    h = (h * 31 + query.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(16);
+}
+
+/**
  * Carrossel horizontal de produtos com auto-play (decisão 09/08).
  * Passa sozinho por padrão (para o usuário perceber que pode arrastar) e
  * pausa quando o usuário interage (hover/scroll/touch). Arrastável com
@@ -108,10 +130,12 @@ function ProductCarousel({
   products,
   theme,
   onAddToCart,
+  onProductClick,
 }: {
   products: RecoveryProduct[];
   theme: RecovaTheme;
   onAddToCart: (p: RecoveryProduct, goToCheckout: boolean) => void;
+  onProductClick: (p: RecoveryProduct) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
@@ -173,7 +197,11 @@ function ProductCarousel({
               }}
             >
               {url ? (
-                <a href={url} aria-label={`Ver ${p.title}`}>
+                <a
+                  href={url}
+                  aria-label={`Ver ${p.title}`}
+                  onClick={() => onProductClick(p)}
+                >
                   {p.image ? (
                     <img
                       src={p.image}
@@ -308,6 +336,22 @@ export default function SearchRecoveryOverlay({
         },
       ]);
       setFlow({ status: "chat" });
+      // Instrumentação (Fase C): exposição da Recova com os produtos reais.
+      track({
+        event: "recova_exposed",
+        session_id: result.session_id,
+        query_hash: hashQuery(term),
+        trigger: "zero_results",
+        products_shown: result.products.length,
+      });
+      for (const p of result.products) {
+        track({
+          event: "recova_product_viewed",
+          session_id: result.session_id,
+          product_id: p.id,
+          price: p.price,
+        });
+      }
     };
 
     start();
@@ -340,6 +384,12 @@ export default function SearchRecoveryOverlay({
               ...prev,
               { role: "agent", text: result.message! },
             ]);
+            // Instrumentação (Fase C): reengajamento.
+            track({
+              event: "recova_reengaged",
+              session_id: sessionId,
+              interaction_type: "reengagement",
+            });
           }
         } catch {
           // reengajamento é best-effort — nunca quebra o chat
@@ -389,6 +439,14 @@ export default function SearchRecoveryOverlay({
               text: `Ótima escolha! 🎉 Adicionei ${product.title} (${formatPrice(product.price)}) ao carrinho.`,
             },
           ]);
+          // Instrumentação (Fase C): compra atribuída à sessão exposta.
+          track({
+            event: "purchase_attributed",
+            session_id: sessionRef.current ?? undefined,
+            exposed_session_id: sessionRef.current ?? undefined,
+            product_id: product.id,
+            price: product.price,
+          });
           if (goToCheckout) {
             const checkoutUrl = cartState?.checkoutUrl;
             if (checkoutUrl) {
@@ -457,11 +515,24 @@ export default function SearchRecoveryOverlay({
         refinementOptions: result.refinement_options,
       },
     ]);
+    // Instrumentação (Fase C): refinamento iniciado.
+    track({
+      event: "recova_refinement_started",
+      session_id: sessionId,
+      interaction_type: "refinement",
+      products_shown: result.products.length,
+    });
   };
 
   const close = () => {
     closedRef.current = true;
     if (reengageTimerRef.current) clearTimeout(reengageTimerRef.current);
+    // Instrumentação (Fase C): fechamento do overlay.
+    track({
+      event: "recova_closed",
+      session_id: sessionRef.current ?? undefined,
+      interaction_type: "close",
+    });
     onClose?.();
   };
 
@@ -569,6 +640,16 @@ export default function SearchRecoveryOverlay({
                   products={msg.products}
                   theme={theme}
                   onAddToCart={handleAddToCart}
+                  onProductClick={(p) => {
+                    // Instrumentação (Fase C): clique em alternativa.
+                    track({
+                      event: "recova_product_clicked",
+                      session_id: sessionRef.current ?? undefined,
+                      interaction_type: "product_click",
+                      product_id: p.id,
+                      price: p.price,
+                    });
+                  }}
                 />
               </div>
             )}
