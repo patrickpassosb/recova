@@ -368,7 +368,7 @@ export default function SearchRecoveryOverlay({
   }, [term]);
 
   // Reengajamento: após 30s de inatividade, envia nova mensagem + som.
-  // Auto-close: após 60s sem interação, o chat fecha sozinho (pedido do Patrick).
+  // O chat NUNCA encerra sozinho — continua enquanto a aba estiver aberta.
   useEffect(() => {
     if (flow.status !== "chat" || closedRef.current) return;
 
@@ -406,16 +406,8 @@ export default function SearchRecoveryOverlay({
     };
 
     schedule();
-
-    // Auto-close: 60s sem interação → fecha o overlay.
-    const autoCloseTimer = setTimeout(() => {
-      if (closedRef.current || flow.status !== "chat") return;
-      close();
-    }, 60_000);
-
     return () => {
       if (reengageTimerRef.current) clearTimeout(reengageTimerRef.current);
-      clearTimeout(autoCloseTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flow.status]);
