@@ -15,6 +15,7 @@ import {
   isStopword,
   lexicalSearch,
   normalize,
+  popularProducts,
   toProductOutput,
   type CatalogProduct,
   type ScoredProduct,
@@ -51,6 +52,7 @@ export const converseOutputSchema = z.object({
         image: z.string().nullable(),
         score: z.number(),
         match_type: z.enum(["MATCH", "PARTIAL"]),
+        variant_id: z.string().nullable().optional().describe("MerchantId para adicionar ao carrinho"),
       }),
     )
     .describe("3+ produtos relevantes à resposta do cliente"),
@@ -64,16 +66,19 @@ const REFINE_SYSTEM_PROMPT = [
   "Você é o agente de recuperação de busca de uma loja de e-commerce.",
   "O catálogo da loja tem estes tipos de produto: sticker, t-shirt, tee, hoodie, sweatshirt, raglan hoodie, bomber jacket, rain jacket, mug, tumbler, bottle, water bottle, backpack, tote bag, hat, bucket hat, winter hat, notebook, pen, pillow, snap case, flip flops, slides, canvas shoes, sneakers, shorts.",
   "O cliente respondeu a uma pergunta de refinamento. Entenda a resposta e responda APENAS com JSON:",
-  '{"terms": ["termos de busca em INGLÊS, separados"], "max_price": número ou null}',
+  '{"terms": ["termos de busca em INGLÊS, separados"], "max_price": número ou null, "sort_by_price": "asc" | "desc" | null}',
   "Regras:",
   "- terms: 2 a 6 termos em inglês que casem com os tipos de produto acima.",
-  "- Se a resposta menciona preço ('até 100', 'mais barato', 'até R$ 50'), coloque o número em max_price.",
+  "- Se a resposta menciona preço numérico ('até 100', 'até R$ 50'), coloque o número em max_price.",
+  "- Se a resposta pede o mais barato/baratinho ('mais barato', 'baratinho', 'mais em conta', 'quero o mais barato'), use sort_by_price: 'asc'.",
+  "- Se a resposta pede o mais caro/premium, use sort_by_price: 'desc'.",
   "- NÃO invente produtos. Só devolva o JSON.",
 ].join("\n");
 
 interface RefineIntent {
   terms: string[];
   max_price: number | null;
+  sort_by_price?: "asc" | "desc" | null;
 }
 
 function fallbackRefine(response: string): RefineIntent {
@@ -81,7 +86,14 @@ function fallbackRefine(response: string): RefineIntent {
   const terms = normalize(response)
     .split(" ")
     .filter((t) => t.length > 1 && !isStopword(t) && !/^\d+$/.test(t));
-  return { terms, max_price: maxPrice ?? null };
+  const low = normalize(response);
+  let sort_by_price: "asc" | "desc" | null = null;
+  if (/(mais barato|baratinho|mais em conta|melhor preço|custo-benefício|custo beneficio)/.test(low)) {
+    sort_by_price = "asc";
+  } else if (/(mais caro|premium|melhor qualidade|top de linha|mais sofisticado)/.test(low)) {
+    sort_by_price = "desc";
+  }
+  return { terms, max_price: maxPrice ?? null, sort_by_price };
 }
 
 async function refineIntent(
@@ -101,12 +113,17 @@ async function refineIntent(
     );
     const parsed = extractJson<RefineIntent>(raw);
     if (parsed && Array.isArray(parsed.terms) && parsed.terms.length > 0) {
+      const sort =
+        parsed.sort_by_price === "asc" || parsed.sort_by_price === "desc"
+          ? parsed.sort_by_price
+          : null;
       return {
         terms: parsed.terms.slice(0, 6).map(String),
         max_price:
           typeof parsed.max_price === "number" && parsed.max_price > 0
             ? parsed.max_price
             : null,
+        sort_by_price: sort,
       };
     }
   } catch (err) {
@@ -177,18 +194,46 @@ export const converseTool = (_env: Env) =>
         .split(" ")
         .filter((t) => t.length > 1 && !isStopword(t) && !/^\d+$/.test(t));
 
-      const results = searchWithRefinement(
+      let results = searchWithRefinement(
         catalog,
         refine,
         sessionTerms,
         maxPrice ?? undefined,
       );
 
-      const fresh = results.filter(
-        (r) => !session.suggestedProductIds.includes(r.product.id),
-      );
+      // Refinamento qualitativo de preço: "mais barato" → ordena por preço asc
+      if (refine.sort_by_price === "asc") {
+        results = [...results].sort((a, b) => a.product.price - b.product.price);
+      } else if (refine.sort_by_price === "desc") {
+        results = [...results].sort((a, b) => b.product.price - a.product.price);
+      }
+
+      // Quando o usuário pede re-ranqueamento por preço, NÃO descartar itens já
+      // sugeridos — ele quer ver o mais barato/caro re-emfatizado, não novidade.
+      // O filtro de novidade só se aplica a buscas de refinamento por termos.
+      const fresh = refine.sort_by_price
+        ? results
+        : results.filter(
+            (r) => !session.suggestedProductIds.includes(r.product.id),
+          );
       const pool = fresh.length >= 3 ? fresh : results;
-      const products = pool.slice(0, 5);
+      let products = pool.slice(0, 5);
+      // Garante o mínimo de 3 no contrato, completando com bestsellers quando
+      // o refinamento não chega a 3 resultados.
+      if (products.length < 3) {
+        const seen = new Set(products.map((p) => p.product.id));
+        const pad = popularProducts(catalog, 5)
+          .filter((p) => !seen.has(p.id))
+          .map((p) => ({
+            product: p,
+            score: 0,
+            matchType: "PARTIAL" as const,
+            rawHits: 0,
+            rawTermCount: 0,
+            rawCoverage: 0,
+          }));
+        products = [...products, ...pad].slice(0, 5);
+      }
       addSuggestedProducts(
         session,
         products.map((p) => p.product.id),
@@ -197,11 +242,15 @@ export const converseTool = (_env: Env) =>
       const names = products.slice(0, 3).map((p) => p.product.title).join(", ");
       const priceNote =
         maxPrice != null ? ` dentro do limite de R$ ${maxPrice}` : "";
+      const sortNote =
+        refine.sort_by_price === "asc"
+          ? " do mais barato para o mais caro"
+          : refine.sort_by_price === "desc"
+            ? " do mais caro para o mais barato"
+            : "";
       const explanation =
-        `Entendi: "${user_response}". Refinei a busca${priceNote} e encontrei: ` +
-        `${names} — ` +
-        `${products.filter((p) => p.matchType === "MATCH").length} correspondência exata ` +
-        `e ${products.filter((p) => p.matchType === "PARTIAL").length} parcial.`;
+        `Entendi: "${user_response}". Refinei a busca${priceNote}${sortNote} e encontrei: ` +
+        `${names}.`;
       const followUp = products[0]
         ? `Algum desses te atende? Se quiser, me conta: prefere ${products[0].product.title} ou quer outra opção?`
         : "O que exatamente você está procurando?";

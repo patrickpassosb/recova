@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "../../runtime";
+import { useAddToCart } from "../../platform/cart";
 import type {
   RecoveryProduct,
   RecoveryResult,
@@ -55,6 +56,8 @@ export default function SearchRecoveryOverlay({
   const reengageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Carrinho real (Shopify via server fn) — "Comprar" agora adiciona de verdade.
+  const addToCart = useAddToCart();
 
   // Scrolla para a última mensagem
   useEffect(() => {
@@ -127,18 +130,54 @@ export default function SearchRecoveryOverlay({
     }, REENGAGE_DELAY_MS);
   };
 
-  // Cliente comprou uma sugestão → ✅ verde
+  // Cliente comprou uma sugestão → adiciona ao carrinho REAL (Shopify).
+  // Só mostra o estado verde ✅ quando a mutation do carrinho confirma.
   const handleBuy = (product: RecoveryProduct) => {
     if (reengageTimerRef.current) clearTimeout(reengageTimerRef.current);
     setMessages((prev) => [
       ...prev,
       { role: "user", text: `Quero comprar: ${product.title}` },
-      {
-        role: "agent",
-        text: `Ótima escolha! Adicionei ${product.title} (${formatPrice(product.price)}) ao carrinho.`,
-      },
     ]);
-    setFlow({ status: "success" });
+    if (!product.variant_id) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "agent",
+          text: "Desculpe, não consegui adicionar este item ao carrinho. Tente por outro produto?",
+        },
+      ]);
+      setFlow({ status: "chat" });
+      scheduleReengage();
+      return;
+    }
+    addToCart.mutate(
+      { merchandiseId: product.variant_id, quantity: 1 },
+      {
+        onSuccess: () => {
+          if (closedRef.current) return;
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "agent",
+              text: `Ótima escolha! 🎉 Adicionei ${product.title} (${formatPrice(product.price)}) ao carrinho.`,
+            },
+          ]);
+          setFlow({ status: "success" });
+        },
+        onError: () => {
+          if (closedRef.current) return;
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "agent",
+              text: "Não consegui adicionar ao carrinho agora. Pode tentar de novo?",
+            },
+          ]);
+          setFlow({ status: "chat" });
+          scheduleReengage();
+        },
+      },
+    );
   };
 
   // Cliente respondeu → converse (loop)

@@ -20,6 +20,7 @@ import {
   isStopword,
   lexicalSearch,
   normalize,
+  popularProducts,
   toProductOutput,
   type CatalogProduct,
   type ScoredProduct,
@@ -60,6 +61,7 @@ export const searchRecoveryOutputSchema = z.object({
         image: z.string().nullable(),
         score: z.number(),
         match_type: z.enum(["MATCH", "PARTIAL"]),
+        variant_id: z.string().nullable().optional().describe("MerchantId para adicionar ao carrinho"),
       }),
     )
     .describe("3+ produtos relevantes do catálogo (nunca inventados)"),
@@ -104,13 +106,17 @@ function fallbackIntent(query: string): Intent {
  * Busca combinada: termos do LLM (inglês) + termos crus da query (PT, com
  * sinônimos). O merge garante que mesmo com LLM lento/ruim o resultado é
  * relevante e chega em <2s.
+ *
+ * Retorna `{ results, lowConfidence }`: `lowConfidence` é true quando a
+ * cobertura dos termos crus do usuário é fraca (falso positivo provável) —
+ * o caller deve clarificar em vez de afirmar "encontrei".
  */
 function combinedSearch(
   catalog: CatalogProduct[],
   intent: Intent,
   query: string,
   maxPrice: number | undefined,
-): ScoredProduct[] {
+): { results: ScoredProduct[]; lowConfidence: boolean } {
   const llmResults = lexicalSearch(catalog, intent.terms, maxPrice);
   const rawTerms = fallbackIntent(query).terms;
   const lexicalResults = lexicalSearch(catalog, rawTerms, maxPrice);
@@ -127,7 +133,20 @@ function combinedSearch(
   // Filtro de ruído: 1 hit solto (prefixo acidental) não é relevância.
   // Se o filtro deixar menos de 3 produtos, relaxa para garantir o mínimo.
   const filtered = merged.filter((r) => r.score >= 0.1);
-  return filtered.length >= 3 ? filtered : merged;
+  const results = filtered.length >= 3 ? filtered : merged;
+
+  // Cobertura do melhor resultado sobre os termos crus: baixa cobertura com
+  // query multi-token = falso positivo (ex.: "camisa do flamengo" → só o
+  // sinônimo camisa casou). Sinaliza para clarificar em vez de afirmar.
+  const rawTermCount = fallbackIntent(query).terms.length;
+  const bestCoverage = results.reduce(
+    (max, r) => Math.max(max, r.rawCoverage),
+    0,
+  );
+  const lowConfidence =
+    rawTermCount > 1 && bestCoverage < 0.6 && results.length > 0;
+
+  return { results, lowConfidence };
 }
 
 const INTENT_CACHE_TTL_MS = 10 * 60_000;
@@ -187,9 +206,21 @@ function buildExplanation(
       : "";
   return (
     `Entendi que você procura "${query}". Encontrei no catálogo${priceNote}: ` +
-    `${names} — ` +
-    `produtos com ${products.filter((p) => p.matchType === "MATCH").length} correspondência ` +
-    `exata e ${products.filter((p) => p.matchType === "PARTIAL").length} parcial com o que você descreveu.`
+    `${names}.`
+  );
+}
+
+function buildLowConfidenceExplanation(query: string): string {
+  return (
+    `Não tenho certeza se encontrei exatamente o que você quer com "${query}". ` +
+    `Encontrei algumas opções que talvez sirvam — me diga se alguma se aproxima:`
+  );
+}
+
+function buildBestsellerExplanation(query: string): string {
+  return (
+    `Não encontrei nada com "${query}" no catálogo, mas estes são os produtos ` +
+    `mais populares da loja. Talvez um deles te interesse:`
   );
 }
 
@@ -230,16 +261,63 @@ export const searchRecoveryTool = (_env: Env) =>
       ]);
 
       const maxPrice = intent.max_price ?? extractMaxPrice(query);
-      const results = combinedSearch(catalog, intent, query, maxPrice ?? undefined);
-
-      const products = pickProducts(results, activeSession.suggestedProductIds);
-      addSuggestedProducts(
-        activeSession,
-        products.map((p) => p.product.id),
+      const { results, lowConfidence } = combinedSearch(
+        catalog,
+        intent,
+        query,
+        maxPrice ?? undefined,
       );
 
-      const explanation = buildExplanation(query, products, intent);
-      const followUp = buildFollowUp(products);
+      let explanation: string;
+      let followUp: string;
+      let chosen: ScoredProduct[];
+
+      if (lowConfidence) {
+        // Cobertura fraca → clarificar em vez de afirmar "encontrei"
+        chosen = results.slice(0, 5);
+        explanation = buildLowConfidenceExplanation(query);
+        followUp = buildFollowUp(chosen);
+      } else if (results.length === 0) {
+        // Nada no catálogo → recupera com bestsellers
+        const bestsellers = popularProducts(catalog, 5);
+        chosen = bestsellers.map((p) => ({
+          product: p,
+          score: 0,
+          matchType: "PARTIAL" as const,
+          rawHits: 0,
+          rawTermCount: 0,
+          rawCoverage: 0,
+        }));
+        explanation = buildBestsellerExplanation(query);
+        followUp = buildFollowUp(chosen);
+      } else {
+        chosen = results;
+        explanation = buildExplanation(query, chosen, intent);
+        followUp = buildFollowUp(chosen);
+      }
+
+      const products = pickProducts(chosen, activeSession.suggestedProductIds);
+      // Garante o mínimo de 3 no contrato, completando com bestsellers quando
+      // a busca (ex.: filtrada por preço) não chega a 3 resultados.
+      let finalProducts = products;
+      if (finalProducts.length < 3) {
+        const seen = new Set(finalProducts.map((p) => p.product.id));
+        const pad = popularProducts(catalog, 5)
+          .filter((p) => !seen.has(p.id))
+          .map((p) => ({
+            product: p,
+            score: 0,
+            matchType: "PARTIAL" as const,
+            rawHits: 0,
+            rawTermCount: 0,
+            rawCoverage: 0,
+          }));
+        finalProducts = [...finalProducts, ...pad].slice(0, 5);
+      }
+      addSuggestedProducts(
+        activeSession,
+        finalProducts.map((p) => p.product.id),
+      );
 
       addMessage(activeSession, "user", query);
       addMessage(
@@ -250,7 +328,7 @@ export const searchRecoveryTool = (_env: Env) =>
 
       return {
         session_id: activeSession.id,
-        products: products.map(toProductOutput),
+        products: finalProducts.map(toProductOutput),
         explanation,
         follow_up_question: followUp,
       };

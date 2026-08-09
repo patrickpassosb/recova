@@ -16,6 +16,8 @@ export interface RecoveryProduct {
   image: string | null;
   score: number;
   match_type: "MATCH" | "PARTIAL";
+  /** MerchantId da variante — usado para adicionar ao carrinho real. */
+  variant_id?: string | null;
 }
 
 export interface RecoveryResult {

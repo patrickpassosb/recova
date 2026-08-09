@@ -16,12 +16,24 @@ export interface CatalogProduct {
   image?: string;
   productType?: string;
   tags?: string[];
+  /** MerchantId da variante default — necessário para adicionar ao carrinho. */
+  variantId?: string;
 }
 
 export interface ScoredProduct {
   product: CatalogProduct;
   score: number;
   matchType: "MATCH" | "PARTIAL";
+  /**
+   * Fração (0..1) de termos CRUOS do usuário que produziram ao menos um hit.
+   * Mede cobertura sobre o que o cliente digitou (não sobre os termos
+   * expandidos por sinônimo), evitando falso positivo quando só um sinônimo
+   * genérico (ex.: camisa→t-shirt) casa e o resto da query não.
+   */
+  rawCoverage: number;
+  /** Quantos termos crus do usuário casaram (de `rawTermCount`). */
+  rawHits: number;
+  rawTermCount: number;
 }
 
 const STORE_NAME = "gimenesdevstore";
@@ -49,6 +61,7 @@ export async function fetchCatalog(): Promise<CatalogProduct[]> {
           tags
           priceRange { minVariantPrice { amount } }
           featuredImage { url }
+          variants(first: 1) { edges { node { id } } }
         }
       }
     }
@@ -85,6 +98,11 @@ export async function fetchCatalog(): Promise<CatalogProduct[]> {
       (node.featuredImage as { url?: string } | null)?.url ?? undefined,
     productType: node.productType ? String(node.productType) : undefined,
     tags: Array.isArray(node.tags) ? node.tags.map(String) : [],
+    variantId: (
+      node.variants as
+        | { edges?: Array<{ node?: { id?: string } }> }
+        | undefined
+    )?.edges?.[0]?.node?.id,
   }));
 
   catalogCache = { at: now, products };
@@ -201,46 +219,71 @@ function tokenize(text: string): string[] {
 
 /**
  * Busca lexical com scoring sobre o catálogo.
- * MATCH = todos os termos casaram; PARTIAL = pelo menos um.
- * Ordena por score desc, depois preço asc.
+ *
+ * - MATCH = todos os termos crus do usuário casaram; PARTIAL = pelo menos um.
+ * - `rawCoverage` mede a fração de termos crus que casaram (contra os
+ *   expandidos por sinônimo), para o caller poder recusar falso positivo
+ *   (ex.: "camisa do flamengo" casando só via sinônimo genérico camisa→t-shirt).
+ * - Produtos com `price <= 0` são sempre excluídos (não são vendíveis).
+ * - Ordena por score desc, depois preço asc.
  */
 export function lexicalSearch(
   catalog: CatalogProduct[],
   queryTerms: string[],
   maxPrice?: number,
 ): ScoredProduct[] {
-  const terms = expandTerms(queryTerms.map(normalize).filter(Boolean));
+  const raw = queryTerms.map(normalize).filter((t) => t.length > 1 && !STOPWORDS.has(t));
+  if (raw.length === 0) return [];
+
+  // mapeia cada termo expandido → índice do termo cru que o originou
+  const expandedOwners = new Map<string, number>();
+  raw.forEach((r, i) => {
+    for (const t of expandTerms([r])) {
+      if (!expandedOwners.has(t)) expandedOwners.set(t, i);
+    }
+  });
+  const terms = [...expandedOwners.keys()];
   if (terms.length === 0) return [];
 
   const results: ScoredProduct[] = [];
 
   for (const product of catalog) {
     if (maxPrice !== undefined && product.price > maxPrice) continue;
+    if (product.price <= 0) continue; // não é vendível
 
     const titleTokens = tokenize(product.title);
     const haystack = titleTokens.join(" ");
     let hits = 0;
     let exactHits = 0;
 
+    // quais termos crus (índice) casaram em ao menos um sinônimo expandido
+    const rawMatched = new Set<number>();
+
     for (const term of terms) {
+      let termHit = false;
       const isMulti = term.includes(" ");
       if (isMulti) {
-        // termo composto ("canvas shoes"): casa como substring do título
         if (haystack.includes(term)) {
           hits++;
           exactHits++;
+          termHit = true;
         }
       } else if (titleTokens.includes(term)) {
-        // token exato
         hits++;
         exactHits++;
+        termHit = true;
       } else if (
         titleTokens.some(
           (tk) => tk.length >= 4 && (tk.startsWith(term) || term.startsWith(tk)),
         )
       ) {
-        // prefixo de token (typo leve / plural)
         hits++;
+        termHit = true;
+      }
+
+      if (termHit) {
+        const owner = expandedOwners.get(term);
+        if (owner !== undefined) rawMatched.add(owner);
       }
     }
 
@@ -250,12 +293,24 @@ export function lexicalSearch(
     results.push({
       product,
       score,
-      matchType: hits === terms.length ? "MATCH" : "PARTIAL",
+      matchType: rawMatched.size === raw.length ? "MATCH" : "PARTIAL",
+      rawHits: rawMatched.size,
+      rawTermCount: raw.length,
+      rawCoverage: raw.length > 0 ? rawMatched.size / raw.length : 0,
     });
   }
 
   results.sort((a, b) => b.score - a.score || a.product.price - b.product.price);
   return results;
+}
+
+/** Produtos populares do catálogo (fallback quando a busca não acha nada). */
+export function popularProducts(catalog: CatalogProduct[], limit = 5): CatalogProduct[] {
+  return catalog
+    .filter((p) => p.price > 0)
+    .slice()
+    .sort((a, b) => a.price - b.price)
+    .slice(0, limit);
 }
 
 /** Formata um produto para o output das tools (shape do BRIEF). */
@@ -267,5 +322,6 @@ export function toProductOutput(p: ScoredProduct) {
     image: p.product.image ?? null,
     score: p.score,
     match_type: p.matchType,
+    variant_id: p.product.variantId ?? null,
   };
 }

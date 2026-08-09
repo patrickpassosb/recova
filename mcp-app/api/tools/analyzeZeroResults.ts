@@ -68,22 +68,9 @@ const CAUSE_RULES: Array<{
   fix: (term: string) => string;
 }> = [
   {
-    cause: "typo",
-    test: (term) => {
-      // typos comuns: acentuação/ortografia errada que normaliza diferente
-      const typos: Record<string, string> = {
-        "tenis": "tênis",
-        "chapeu": "chapéu",
-        "sueter": "suéter",
-        "calca": "calça",
-        "bone": "boné",
-        "caneca": "caneca",
-      };
-      return Object.keys(typos).some((t) => term === t);
-    },
-    fix: (term) => `Corrigir ortografia: "${term}" → "${normalize(term)}"`,
-  },
-  {
+    // Ordem importa: "sinônimo" e "regionalismo" primeiro — "tenis nike" é
+    // melhor classificado como sinônimo (tenis→shoes) do que como typo, e o
+    // "fix" de typo não pode ser um no-op (ver regra typo abaixo).
     cause: "sinonimo",
     test: (term, catalogTitles) => {
       // qualquer token do termo com sinônimo que casa com o catálogo
@@ -134,6 +121,34 @@ const CAUSE_RULES: Array<{
       return regional.some((r) => normalize(term).includes(normalize(r)));
     },
     fix: (term) => `Adicionar regionalismo: "${term}" → sinônimo local (ex.: chinelo → flip flops)`,
+  },
+  {
+    cause: "typo",
+    test: (term) => {
+      // typos comuns: acentuação/ortografia errada que normaliza diferente
+      const typos: Record<string, string> = {
+        "tenis": "tênis",
+        "chapeu": "chapéu",
+        "sueter": "suéter",
+        "calca": "calça",
+        "bone": "boné",
+        "caneca": "caneca",
+      };
+      return Object.keys(typos).some((t) => term === t);
+    },
+    // Corrige de verdade: devolve a forma acentuada, não um no-op via normalize.
+    fix: (term) => {
+      const typos: Record<string, string> = {
+        "tenis": "tênis",
+        "chapeu": "chapéu",
+        "sueter": "suéter",
+        "calca": "calça",
+        "bone": "boné",
+        "caneca": "caneca",
+      };
+      const corrected = typos[term] ?? term;
+      return `Corrigir ortografia: "${term}" → "${corrected}"`;
+    },
   },
   {
     cause: "nao_catalogado",
