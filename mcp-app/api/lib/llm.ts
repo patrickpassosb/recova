@@ -13,10 +13,28 @@ export interface LlmMessage {
   content: string;
 }
 
-const LLM_URL = "https://ollama.com/v1/chat/completions";
-const LLM_MODEL = "deepseek-v4-flash:preview";
-const LLM_API_KEY = process.env.OLLAMA_API_KEY ?? "";
-const LLM_TIMEOUT_MS = 3000;
+/**
+ * Configuração do LLM, 100% via variáveis de ambiente (reversível):
+ *
+ * Ordem de precedência (primeiro que estiver setado vence):
+ *   1. `OLLAMA_API_KEY`  → `https://ollama.com/v1/chat/completions`, `deepseek-v4-flash:preview`
+ *   2. `OPENAI_API_KEY`  → usa `OPENAI_BASE_URL` (default `https://api.openai.com/v1`) e `OPENAI_MODEL`
+ *
+ * Na VPS de dev, o padrão é o proxy Tailscale (`OPENAI_BASE_URL` + `OPENAI_API_KEY` +
+ * `OPENAI_MODEL=ollama-cloud/deepseek-v4-flash`). Se nenhuma chave existir, o agente
+ * opera 100% em fallback lexical (tools ainda funcionam, sem LLM).
+ */
+const OLLAMA_URL = "https://ollama.com/v1/chat/completions";
+const OLLAMA_MODEL = "deepseek-v4-flash:preview";
+const OPENAI_DEFAULT_URL = "https://api.openai.com/v1";
+
+const LLM_API_KEY = process.env.OLLAMA_API_KEY || process.env.OPENAI_API_KEY || "";
+const LLM_URL = process.env.OLLAMA_API_KEY
+  ? OLLAMA_URL
+  : `${(process.env.OPENAI_BASE_URL || OPENAI_DEFAULT_URL).replace(/\/+$/, "")}/chat/completions`;
+const LLM_MODEL =
+  process.env.OLLAMA_API_KEY ? OLLAMA_MODEL : (process.env.OPENAI_MODEL || "gpt-4o-mini");
+const LLM_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS) || 3000;
 
 export class LlmError extends Error {}
 

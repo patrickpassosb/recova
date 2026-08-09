@@ -163,7 +163,7 @@ function combinedSearch(
 }
 
 const INTENT_CACHE_TTL_MS = 10 * 60_000;
-const intentCache = new Map<string, { at: number; intent: Intent }>();
+const intentCache = new Map<string, { at: number; intent: IntentResult }>();
 
 interface IntentResult extends Intent {
   refinement_options: string[];
@@ -176,7 +176,7 @@ async function understandIntent(
   const key = normalize(query);
   const hit = intentCache.get(key);
   if (hit && Date.now() - hit.at < INTENT_CACHE_TTL_MS) {
-    return { ...hit.intent, refinement_options: [] };
+    return { ...hit.intent };
   }
 
   let intent: Intent | null = null;
@@ -216,12 +216,12 @@ async function understandIntent(
     }
   }
 
-  const final = intent ?? fallbackIntent(query);
-  intentCache.set(key, { at: Date.now(), intent: final });
-  return {
-    ...final,
+  const final: IntentResult = {
+    ...(intent ?? fallbackIntent(query)),
     refinement_options: options.length >= 2 ? options : ["Mais barato", "Mais caro"],
   };
+  intentCache.set(key, { at: Date.now(), intent: final });
+  return { ...final };
 }
 
 function pickProducts(results: ScoredProduct[], excludeIds: string[]): ScoredProduct[] {
@@ -336,12 +336,15 @@ export const searchRecoveryTool = (_env: Env) =>
       const products = pickProducts(chosen, activeSession.suggestedProductIds);
       // Garante o mínimo de 3 no contrato, completando com bestsellers quando
       // a busca (ex.: filtrada por preço) não chega a 3 resultados.
-      // O padding respeita o teto de preço (não estoura o orçamento do cliente).
+      // O padding respeita o teto de preço (não estoura o orçamento do cliente)
+      // e NUNCA repete produtos já sugeridos na sessão (loop não mostra 2x o
+      // mesmo produto ao cliente).
       let finalProducts = products;
       let padded = false;
       if (finalProducts.length < 3) {
         const seen = new Set(finalProducts.map((p) => p.product.id));
-        const pad = popularProducts(catalog, 5)
+        for (const id of activeSession.suggestedProductIds) seen.add(id);
+        const pad = popularProducts(catalog, 8)
           .filter((p) => !seen.has(p.id))
           .filter((p) => maxPrice === undefined || p.price <= maxPrice)
           .map((p) => ({
