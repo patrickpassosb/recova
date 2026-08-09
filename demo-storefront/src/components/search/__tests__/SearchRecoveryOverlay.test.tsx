@@ -95,4 +95,20 @@ describe("SearchRecoveryOverlay", () => {
     fireEvent.click(closeButtons[closeButtons.length - 1]);
     expect(closed).toBe(true);
   });
+
+  it("shows two action buttons per product (Comprar + Adicionar ao carrinho)", async () => {
+    renderOverlay();
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    expect(screen.getByText("Comprar")).toBeTruthy();
+    expect(screen.getByText("Adicionar ao carrinho")).toBeTruthy();
+  });
+
+  it("renders the product carousel with auto-play track", async () => {
+    renderOverlay();
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    // The carousel track is the scrollable container holding the product card.
+    const track = document.querySelector("[data-card]")?.parentElement;
+    expect(track).toBeTruthy();
+    expect(track?.className).toContain("overflow-x-auto");
+  });
 });

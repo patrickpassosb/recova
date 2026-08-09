@@ -25,6 +25,7 @@ import {
   recovaDefaultTheme,
   resolveTheme,
   themeToCssVars,
+  type RecovaTheme,
   type RecovaThemeConfig,
 } from "./recovaTheme";
 
@@ -95,6 +96,156 @@ function playAlertSound() {
   } catch {
     // som é opcional — nunca quebra o fluxo
   }
+}
+
+/**
+ * Carrossel horizontal de produtos com auto-play (decisão 09/08).
+ * Passa sozinho por padrão (para o usuário perceber que pode arrastar) e
+ * pausa quando o usuário interage (hover/scroll/touch). Arrastável com
+ * scroll-snap.
+ */
+function ProductCarousel({
+  products,
+  theme,
+  onAddToCart,
+}: {
+  products: RecoveryProduct[];
+  theme: RecovaTheme;
+  onAddToCart: (p: RecoveryProduct, goToCheckout: boolean) => void;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(false);
+  const [paused, setPaused] = useState(false);
+
+  // Auto-play: rola um card por vez a cada 3s, até o fim, e volta ao início.
+  useEffect(() => {
+    if (products.length <= 1) return;
+    const el = trackRef.current;
+    if (!el) return;
+    const card = el.querySelector<HTMLElement>("[data-card]");
+    if (!card) return;
+    const step = card.offsetWidth + 8; // card + gap
+    const id = setInterval(() => {
+      if (pausedRef.current) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (el.scrollLeft >= max - 4) {
+        el.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        el.scrollBy({ left: step, behavior: "smooth" });
+      }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [products.length]);
+
+  const pause = () => {
+    pausedRef.current = true;
+    setPaused(true);
+  };
+  const resume = () => {
+    pausedRef.current = false;
+    setPaused(false);
+  };
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={pause}
+      onMouseLeave={resume}
+      onTouchStart={pause}
+      onTouchEnd={resume}
+    >
+      <div
+        ref={trackRef}
+        className="flex gap-2 overflow-x-auto pb-1"
+        style={{ scrollSnapType: "x mandatory" }}
+      >
+        {products.map((p) => {
+          const url = productUrl(p.handle);
+          return (
+            <div
+              key={p.id}
+              data-card
+              className="flex w-40 shrink-0 flex-col gap-2 rounded-lg border p-2 shadow-sm"
+              style={{
+                backgroundColor: theme.colors.cardBg,
+                borderColor: theme.colors.border,
+                scrollSnapAlign: "start",
+              }}
+            >
+              {url ? (
+                <a href={url} aria-label={`Ver ${p.title}`}>
+                  {p.image ? (
+                    <img
+                      src={p.image}
+                      alt={p.title}
+                      className="h-24 w-full rounded-md object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="h-24 w-full rounded-md"
+                      style={{ backgroundColor: theme.colors.border }}
+                    />
+                  )}
+                </a>
+              ) : p.image ? (
+                <img
+                  src={p.image}
+                  alt={p.title}
+                  className="h-24 w-full rounded-md object-cover"
+                />
+              ) : (
+                <div
+                  className="h-24 w-full rounded-md"
+                  style={{ backgroundColor: theme.colors.border }}
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                {url ? (
+                  <a
+                    href={url}
+                    className="block truncate text-sm font-medium hover:underline"
+                    style={{ color: theme.colors.text }}
+                  >
+                    {p.title}
+                  </a>
+                ) : (
+                  <p className="truncate text-sm font-medium" style={{ color: theme.colors.text }}>
+                    {p.title}
+                  </p>
+                )}
+                <p className="text-xs" style={{ color: theme.colors.muted }}>
+                  {formatPrice(p.price)}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => onAddToCart(p, true)}
+                  disabled={paused}
+                  className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-40"
+                  style={{ backgroundColor: theme.colors.primary }}
+                >
+                  {theme.copy.buy}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddToCart(p, false)}
+                  disabled={paused}
+                  className="rounded-md border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
+                  style={{
+                    borderColor: theme.colors.primary,
+                    color: theme.colors.primary,
+                  }}
+                >
+                  {theme.copy.addToCart}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default function SearchRecoveryOverlay({
@@ -412,95 +563,13 @@ export default function SearchRecoveryOverlay({
             {msg.role === "agent" && msg.products && msg.products.length > 0 && (
               <div className="flex w-full flex-col gap-2">
                 {/* Carrossel horizontal de produtos (decisão 09/08): arrastável,
-                    com scroll-snap. Não é lista vertical comprida. */}
-                <div
-                  className="flex gap-2 overflow-x-auto pb-1"
-                  style={{ scrollSnapType: "x mandatory" }}
-                >
-                  {msg.products.map((p) => {
-                    const url = productUrl(p.handle);
-                    return (
-                      <div
-                        key={p.id}
-                        className="flex w-40 shrink-0 flex-col gap-2 rounded-lg border p-2 shadow-sm"
-                        style={{
-                          backgroundColor: theme.colors.cardBg,
-                          borderColor: theme.colors.border,
-                          scrollSnapAlign: "start",
-                        }}
-                      >
-                        {url ? (
-                          <a href={url} aria-label={`Ver ${p.title}`}>
-                            {p.image ? (
-                              <img
-                                src={p.image}
-                                alt={p.title}
-                                className="h-24 w-full rounded-md object-cover"
-                              />
-                            ) : (
-                              <div
-                                className="h-24 w-full rounded-md"
-                                style={{ backgroundColor: theme.colors.border }}
-                              />
-                            )}
-                          </a>
-                        ) : p.image ? (
-                          <img
-                            src={p.image}
-                            alt={p.title}
-                            className="h-24 w-full rounded-md object-cover"
-                          />
-                        ) : (
-                          <div
-                            className="h-24 w-full rounded-md"
-                            style={{ backgroundColor: theme.colors.border }}
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          {url ? (
-                            <a
-                              href={url}
-                              className="block truncate text-sm font-medium hover:underline"
-                              style={{ color: theme.colors.text }}
-                            >
-                              {p.title}
-                            </a>
-                          ) : (
-                            <p className="truncate text-sm font-medium" style={{ color: theme.colors.text }}>
-                              {p.title}
-                            </p>
-                          )}
-                          <p className="text-xs" style={{ color: theme.colors.muted }}>
-                            {formatPrice(p.price)}
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleAddToCart(p, true)}
-                            disabled={isSuccess}
-                            className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-40"
-                            style={{ backgroundColor: theme.colors.primary }}
-                          >
-                            {theme.copy.buy}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleAddToCart(p, false)}
-                            disabled={isSuccess}
-                            className="rounded-md border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
-                            style={{
-                              borderColor: theme.colors.primary,
-                              color: theme.colors.primary,
-                            }}
-                          >
-                            {theme.copy.addToCart}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                    com scroll-snap e auto-play (passa sozinho por padrão, pausa
+                    quando o usuário interage). Não é lista vertical comprida. */}
+                <ProductCarousel
+                  products={msg.products}
+                  theme={theme}
+                  onAddToCart={handleAddToCart}
+                />
               </div>
             )}
           </div>
