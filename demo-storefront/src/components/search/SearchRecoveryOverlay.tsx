@@ -798,6 +798,9 @@ export default function SearchRecoveryOverlay({
             alt={theme.brandName}
             className="h-3.5 w-auto"
           />
+          <span className="font-semibold" style={{ color: theme.colors.text }}>
+            {theme.brandName}
+          </span>
         </a>
       )}
     </div>
