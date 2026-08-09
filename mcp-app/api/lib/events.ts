@@ -29,7 +29,8 @@ export type RecovaEventName =
   | "recova_refinement_started"
   | "recova_reengaged"
   | "recova_closed"
-  | "purchase_attributed";
+  | "purchase_attributed"
+  | "checkout_started";
 
 export interface RecovaEvent {
   event: RecovaEventName;

@@ -23,6 +23,7 @@ const EVENT_NAMES = [
   "recova_reengaged",
   "recova_closed",
   "purchase_attributed",
+  "checkout_started",
 ] as const;
 
 export const trackEventInputSchema = z.object({

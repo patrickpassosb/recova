@@ -420,6 +420,7 @@ export default function SearchModal({
       {recoveryTerm && (
         <SearchRecoveryOverlay
           term={recoveryTerm}
+          variant="inline"
           onClose={() => {
             dismissedTermsRef.current.add(recoveryTerm);
             setRecoveryTerm(null);

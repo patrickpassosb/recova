@@ -104,6 +104,8 @@ export default function DashboardPage() {
 					<MetricCard label="Receita / busca falha" value={`R$ ${metrics.revenue_per_failed_search.toLocaleString("pt-BR")}`} />
 					<MetricCard label="CTR alternativas" value={metrics.click_through_rate} suffix="%" />
 					<MetricCard label="Taxa de refinamento" value={metrics.refinement_rate} suffix="%" />
+					<MetricCard label="Produtos / usuário" value={metrics.products_per_user} />
+					<MetricCard label="Checkout iniciado" value={metrics.checkout_rate} suffix="%" />
 				</div>
 
 				<Card>

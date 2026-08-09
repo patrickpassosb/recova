@@ -46,6 +46,10 @@ export const dashboardOutputSchema = z.object({
     refinement_rate: z.number(),
     /** % de reengajamentos sobre sessões expostas. */
     reengagement_rate: z.number(),
+    /** Média de produtos vistos por usuário exposto. */
+    products_per_user: z.number(),
+    /** % de sessões expostas que iniciaram checkout (venda real vs carrinho abandonado). */
+    checkout_rate: z.number(),
   }),
   recent: z.array(
     z.object({
@@ -129,6 +133,15 @@ export const dashboardTool = (_env: Env) =>
           ? Math.round((reengagements / exposedCount) * 1000) / 10
           : 0;
 
+      // Média de produtos vistos por usuário exposto (pedido do Patrick).
+      const productsPerUser =
+        exposedCount > 0 ? Math.round((productViews / exposedCount) * 10) / 10 : 0;
+
+      // Checkout iniciado (venda real) vs carrinho abandonado (pedido do Patrick).
+      const checkouts = count("checkout_started");
+      const checkoutRate =
+        exposedCount > 0 ? Math.round((checkouts / exposedCount) * 1000) / 10 : 0;
+
       const recent = events
         .slice(-20)
         .reverse()
@@ -162,6 +175,8 @@ export const dashboardTool = (_env: Env) =>
           click_through_rate: clickThroughRate,
           refinement_rate: refinementRate,
           reengagement_rate: reengagementRate,
+          products_per_user: productsPerUser,
+          checkout_rate: checkoutRate,
         },
         recent,
       };

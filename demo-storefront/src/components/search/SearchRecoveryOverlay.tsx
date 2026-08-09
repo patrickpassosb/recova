@@ -363,7 +363,7 @@ export default function SearchRecoveryOverlay({
   }, [term]);
 
   // Reengajamento: após 30s de inatividade, envia nova mensagem + som.
-  // O chat NUNCA encerra sozinho — continua enquanto a aba estiver aberta.
+  // Auto-close: após 60s sem interação, o chat fecha sozinho (pedido do Patrick).
   useEffect(() => {
     if (flow.status !== "chat" || closedRef.current) return;
 
@@ -401,8 +401,16 @@ export default function SearchRecoveryOverlay({
     };
 
     schedule();
+
+    // Auto-close: 60s sem interação → fecha o overlay.
+    const autoCloseTimer = setTimeout(() => {
+      if (closedRef.current || flow.status !== "chat") return;
+      close();
+    }, 60_000);
+
     return () => {
       if (reengageTimerRef.current) clearTimeout(reengageTimerRef.current);
+      clearTimeout(autoCloseTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flow.status]);
@@ -449,6 +457,16 @@ export default function SearchRecoveryOverlay({
             price: product.price,
           });
           if (goToCheckout) {
+            // Instrumentação (Fase C): checkout iniciado — distingue venda
+            // real de carrinho abandonado no dashboard. Emitido no clique
+            // "Comprar" (intenção de finalizar), antes da navegação.
+            track({
+              event: "checkout_started",
+              session_id: sessionRef.current ?? undefined,
+              exposed_session_id: sessionRef.current ?? undefined,
+              product_id: product.id,
+              price: product.price,
+            });
             const checkoutUrl = cartState?.checkoutUrl;
             if (checkoutUrl) {
               window.location.href = checkoutUrl;
