@@ -13,18 +13,33 @@ A Recova é uma camada de IA para e-commerce que é acionada quando a busca da l
 - **63% dos lojistas estão insatisfeitos** com a busca nativa da plataforma
 - Usuários de busca **convertem 3–5x mais** que navegadores — é o canal de maior intenção de compra, e ele está vazando
 
+## O impacto em números (bottom-up)
+
+> **Loja de alto volume:** 40 mil buscas/dia · 12% zero-results = **4.800 buscas perdidas/dia** · conversão base 3,1% · AOV R$ 120
+> = **≈ R$ 4,3 milhões/ano de receita em risco.**
+>
+> A Recova recuperando **só 10%** disso = **+R$ 430 mil/ano**, a custo de **< R$ 0,05 por conversa**.
+
+A conta inteira (buscas → zero-results → conversão × AOV → receita recuperada) está no final do README e na apresentação — o júri não discute número com a conta na mesa.
+
 ## A solução
 
-Camada fina de IA que atua **sobre** a busca nativa (não substitui):
+Camada fina de IA que atua **sobre** a busca nativa (não substitui) — e funciona como um **loop agêntico fechado** (a linguagem da Deco: *observar → diagnosticar → propor → executar → medir → aprender*), não como um chatbot esperando prompt:
 
+```text
+OBSERVAR   busca nativa retorna zero results (ou baixa relevância)
+   ↓
+DIAGNOSTICAR  understand_intent (LLM) → termos/categoria/preço + causa do vazamento
+   ↓
+PROPOR      3+ produtos REAIS do catálogo (Storefront API, grounded) em <2s + explicação
+   ├── CLIENTE COMPROU → EXECUTAR (add-to-cart) → ✅ SUCESSO (verde)
+   ├── CLIENTE RESPONDEU → 3+ produtos + explicação + nova pergunta (loop ↺)
+   └── NÃO RESPONDEU em 30s → reengajamento (máx 2) → ❌ sem conversão (vermelho)
+   ↓
+MEDIR/APRENDER  analyze_zero_results → relatório de causas + correções (T4)
 ```
-Pesquisa do produto → busca falha (zero results / baixa relevância)
-    ↓
-Recova entra como chat: 3+ produtos relevantes em <2s
-    ├── Cliente comprou → ✅ SUCESSO (verde)
-    ├── Cliente respondeu → 3+ produtos + explicação + nova pergunta (loop)
-    └── Não respondeu em 30s → nova pergunta (reengajamento) → ❌ sem conversão (vermelho)
-```
+
+As 4 tools MCP mapeiam exatamente esse loop: **`search_recovery`** (observar/diagnosticar/propor), **`converse`** (refinar), **`reengage`** (não desistir), **`analyze_zero_results`** (medir & aprender — o que transforma o responder em agente operador).
 
 ### Diferenciação
 
@@ -92,6 +107,27 @@ bun run dev          # storefront com overlay conversacional
 - Deco Studio (créditos) + MCP App + demo-storefront
 - DeepSeek V4 Flash
 - Bun, TanStack Start, React 19, Tailwind v4
+
+---
+
+## A conta da receita recuperada (bottom-up)
+
+Premissas de uma loja de alto volume (todas citáveis, todas conservadoras):
+
+| Linha | Valor | Fonte |
+|---|---|---|
+| Buscas internas/dia | 40.000 | loja alto volume (referência mercado) |
+| Taxa de zero-results | 12% | SearchMind 12,5% global; LATAM lidera |
+| Buscas perdidas/dia | 4.800 | 40.000 × 12% |
+| Conversão base (busca) | 3,1% | benchmark indústria |
+| AOV | R$ 120 | tíquete médio SMB brasileiro |
+| Receita em risco/ano | **≈ R$ 4,3 M** | 4.800 × 3,1% × R$ 120 × 365 |
+| Taxa de recuperação da Recova | 10% | conservador; target do MVP 30%+ |
+| **Receita recuperada/ano** | **≈ R$ 430 mil** | 4,3 M × 10% |
+| Custo por conversa | **< R$ 0,05** | DeepSeek V4 Flash, cache, max_tokens baixo |
+| Custo anual ≈ | R$ 2.900 | 4.800 × 365 × 10% × R$ 0,05 |
+
+Mesmo recuperando **1 em cada 10** buscas perdidas e com custo de centavos por conversa, o ROI é de **centenas de milhares de reais/ano** — sem trocar a busca, sem dev, sem custo de adoção.
 
 ---
 
