@@ -49,7 +49,7 @@ export default function Bag({ size = "md" }: { size?: "sm" | "md" }) {
         "frost tap-scale inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-3 text-sm font-medium capitalize transition-colors duration-(--duration-fast) hover:bg-glass-strong",
       )}
     >
-      {busy ? <span className="loading loading-spinner loading-xs" /> : "Sacola"}
+      {busy ? <span className="loading loading-spinner loading-xs" /> : "Bag"}
       {!busy && count > 0 && (
         <span className="tabular-nums text-muted">({count > 9 ? "9+" : count})</span>
       )}

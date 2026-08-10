@@ -114,8 +114,7 @@ describe("searchRecoveryLoader", () => {
   });
 
   it("returns null and swallows errors when the MCP server is down", async () => {
-    globalThis.fetch = (async () =>
-      new Response("down", { status: 503 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response("down", { status: 503 })) as typeof fetch;
     const res = await searchRecoveryLoader({ query: "tenis" });
     expect(res).toBeNull();
   });
@@ -133,7 +132,11 @@ describe("searchRecoveryLoader", () => {
         status: 200,
         headers: { "Content-Type": "text/event-stream" },
       })) as typeof fetch;
-    const res = await searchRecoveryLoader({ action: "converse", session_id: "x", user_response: "oi" });
+    const res = await searchRecoveryLoader({
+      action: "converse",
+      session_id: "x",
+      user_response: "oi",
+    });
     expect(res).toBeNull();
   });
 });

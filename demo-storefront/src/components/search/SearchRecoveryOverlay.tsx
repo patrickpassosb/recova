@@ -17,10 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "../../runtime";
 import { useAddToCart, useCart } from "../../platform/cart";
-import type {
-  RecoveryProduct,
-  RecoveryResult,
-} from "../../loaders/searchRecovery";
+import type { RecoveryProduct, RecoveryResult } from "../../loaders/searchRecovery";
 import {
   recovaDefaultTheme,
   resolveTheme,
@@ -47,6 +44,8 @@ export interface SearchRecoveryOverlayProps {
    *   recomendações ao digitar) — decisão da reunião 09/08, não é pop-up.
    */
   variant?: "popup" | "inline";
+  /** Distribuição do Coverflow: mascarado na busca, amplo na página de resultados. */
+  carouselLayout?: "masked" | "wide";
 }
 
 type ChatMessage =
@@ -59,10 +58,22 @@ type ChatMessage =
     }
   | { role: "user"; text: string };
 
-type FlowState =
-  | { status: "loading" }
-  | { status: "chat" }
-  | { status: "success" }; // ✅ verde
+export function getLatestRefinementOptions(
+  messages: Array<{ role: "agent" | "user"; refinementOptions?: string[] }>,
+): string[] | undefined {
+  return [...messages]
+    .reverse()
+    .find((message) => message.role === "agent" && message.refinementOptions?.length)
+    ?.refinementOptions;
+}
+
+type FlowState = { status: "loading" } | { status: "chat" } | { status: "success" }; // ✅ verde
+
+const REENGAGEMENT_DELAY_MS = 60_000;
+
+export function getReengagementDelay(lastActivityAt: number, now = Date.now()): number {
+  return Math.max(0, REENGAGEMENT_DELAY_MS - (now - lastActivityAt));
+}
 
 function formatPrice(price: number): string {
   return `R$ ${price.toFixed(2).replace(".", ",")}`;
@@ -78,10 +89,8 @@ function productUrl(handle?: string | null): string | null {
 function playAlertSound() {
   try {
     const Ctx =
-      (window as unknown as { AudioContext?: typeof AudioContext })
-        .AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
+      (window as unknown as { AudioContext?: typeof AudioContext }).AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
     const osc = ctx.createOscillator();
@@ -108,11 +117,9 @@ function playAlertSound() {
  * MCP track_event. Best-effort: nunca quebra o fluxo se falhar.
  */
 function track(event: Record<string, unknown>): void {
-  invoke.site.loaders
-    .searchRecovery({ action: "track_event", event })
-    .catch(() => {
-      // instrumentação é best-effort — não quebra o overlay
-    });
+  invoke.site.loaders.searchRecovery({ action: "track_event", event }).catch(() => {
+    // instrumentação é best-effort — não quebra o overlay
+  });
 }
 
 /** Hash simples de uma query (para o query_hash do schema). */
@@ -124,97 +131,167 @@ function hashQuery(query: string): string {
   return (h >>> 0).toString(16);
 }
 
-/**
- * Carrossel horizontal de produtos com auto-play (decisão 09/08).
- * Passa sozinho por padrão (para o usuário perceber que pode arrastar) e
- * pausa quando o usuário interage (hover/scroll/touch). Arrastável com
- * scroll-snap.
- */
+/** Coverflow adaptado do padrão visual do OriginKit para cards de produto. */
 function ProductCarousel({
   products,
   theme,
   onAddToCart,
   onProductClick,
+  isAddingToCart,
+  autoPlay,
+  layout,
 }: {
   products: RecoveryProduct[];
   theme: RecovaTheme;
   onAddToCart: (p: RecoveryProduct, goToCheckout: boolean) => void;
   onProductClick: (p: RecoveryProduct) => void;
+  isAddingToCart: boolean;
+  autoPlay: boolean;
+  layout: "masked" | "wide";
 }) {
-  const trackRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [rotationPaused, setRotationPaused] = useState(false);
+  const [stageWidth, setStageWidth] = useState(0);
+  const stageRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
-  const [paused, setPaused] = useState(false);
+  const touchStartRef = useRef<number | null>(null);
 
-  // Auto-play: rola um card por vez a cada 3s, até o fim, e volta ao início.
   useEffect(() => {
-    if (products.length <= 1) return;
-    const el = trackRef.current;
-    if (!el) return;
-    const card = el.querySelector<HTMLElement>("[data-card]");
-    if (!card) return;
-    const step = card.offsetWidth + 8; // card + gap
+    setActiveIndex(0);
+  }, [products]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const updateWidth = () => setStageWidth(stage.clientWidth);
+    updateWidth();
+    if (typeof window.ResizeObserver !== "function") return;
+    const observer = new window.ResizeObserver(updateWidth);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!autoPlay || products.length <= 1 || rotationPaused) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (reducedMotion.matches) return;
     const id = setInterval(() => {
-      if (pausedRef.current) return;
-      const max = el.scrollWidth - el.clientWidth;
-      if (el.scrollLeft >= max - 4) {
-        el.scrollTo({ left: 0, behavior: "smooth" });
-      } else {
-        el.scrollBy({ left: step, behavior: "smooth" });
-      }
+      if (pausedRef.current || document.hidden) return;
+      setActiveIndex((index) => (index + 1) % products.length);
     }, 3000);
     return () => clearInterval(id);
-  }, [products.length]);
+  }, [autoPlay, products.length, rotationPaused]);
 
-  const pause = () => {
-    pausedRef.current = true;
-    setPaused(true);
+  const move = (direction: -1 | 1) => {
+    setActiveIndex((index) => (index + direction + products.length) % products.length);
   };
-  const resume = () => {
-    pausedRef.current = false;
-    setPaused(false);
+
+  const relativeOffset = (index: number) => {
+    let offset = index - activeIndex;
+    if (offset > products.length / 2) offset -= products.length;
+    if (offset < -products.length / 2) offset += products.length;
+    return offset;
   };
+
+  const cardWidth = layout === "masked" ? 240 : 320;
+  const visibleSideCount = Math.min(2, Math.floor((products.length - 1) / 2));
+  const wideSpacing =
+    stageWidth > 0 && visibleSideCount > 0
+      ? Math.max(cardWidth * 0.72, (stageWidth - cardWidth - 32) / (visibleSideCount * 2))
+      : cardWidth * 0.9;
+  const cardSpacing = layout === "masked" ? cardWidth * 0.72 : wideSpacing;
 
   return (
     <div
-      className="relative"
-      onMouseEnter={pause}
-      onMouseLeave={resume}
-      onTouchStart={pause}
-      onTouchEnd={resume}
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Produtos recomendados"
+      data-carousel-layout={layout}
+      className="relative w-full overflow-hidden rounded-lg py-2"
+      onMouseEnter={() => {
+        pausedRef.current = true;
+      }}
+      onMouseLeave={() => {
+        pausedRef.current = false;
+      }}
+      onFocus={() => {
+        pausedRef.current = true;
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          pausedRef.current = false;
+        }
+      }}
+      onTouchStart={(event) => {
+        pausedRef.current = true;
+        touchStartRef.current = event.touches[0]?.clientX ?? null;
+      }}
+      onTouchEnd={(event) => {
+        const start = touchStartRef.current;
+        const end = event.changedTouches[0]?.clientX;
+        if (start != null && end != null && Math.abs(start - end) > 35) {
+          move(start > end ? 1 : -1);
+        }
+        touchStartRef.current = null;
+        pausedRef.current = false;
+      }}
     >
       <div
-        ref={trackRef}
-        className="flex gap-2 overflow-x-auto pb-1"
-        style={{ scrollSnapType: "x mandatory" }}
+        ref={stageRef}
+        className={`relative mx-auto w-full [perspective:1100px] ${
+          layout === "masked" ? "h-[24rem]" : "h-[29.5rem]"
+        }`}
       >
         {products.map((p) => {
           const url = productUrl(p.handle);
+          const index = products.indexOf(p);
+          const offset = relativeOffset(index);
+          const isActive = offset === 0;
+          const isVisible = Math.abs(offset) <= 2;
           return (
-            <div
+            <article
               key={p.id}
               data-card
-              className="flex w-40 shrink-0 flex-col gap-2 rounded-lg border p-2 shadow-sm"
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`Produto ${index + 1} de ${products.length}`}
+              aria-hidden={!isVisible}
+              className={`absolute left-1/2 top-1/2 flex flex-col gap-2 overflow-hidden rounded-lg border p-2 shadow-md motion-safe:transition-[transform,opacity] motion-safe:duration-300 motion-safe:ease-in-out ${
+                layout === "masked" ? "h-[22rem] w-60" : "h-[27.5rem] w-80"
+              }`}
               style={{
                 backgroundColor: theme.colors.cardBg,
                 borderColor: theme.colors.border,
-                scrollSnapAlign: "start",
+                opacity: isVisible ? (isActive ? 1 : 0.58) : 0,
+                pointerEvents: isVisible ? "auto" : "none",
+                transform: `translate(-50%, -50%) translateX(${offset * cardSpacing}px) translateZ(${isActive ? 0 : -140}px) rotateY(${offset * -14}deg) scale(${isActive ? 1 : 0.86})`,
+                zIndex: 10 - Math.abs(offset),
               }}
             >
-              {url ? (
-                <a
-                  href={url}
-                  aria-label={`Ver ${p.title}`}
-                  onClick={() => onProductClick(p)}
-                >
+              {!isActive && isVisible && (
+                <button
+                  type="button"
+                  aria-label={`Selecionar ${p.title}`}
+                  onClick={() => {
+                    pausedRef.current = true;
+                    setActiveIndex(index);
+                  }}
+                  className="absolute inset-0 z-20 cursor-pointer rounded-lg bg-transparent focus-visible:ring-2"
+                />
+              )}
+              {url && isActive ? (
+                <a href={url} aria-label={`Ver ${p.title}`} onClick={() => onProductClick(p)}>
                   {p.image ? (
                     <img
                       src={p.image}
                       alt={p.title}
-                      className="h-24 w-full rounded-md object-cover"
+                      className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md object-contain`}
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div
-                      className="h-24 w-full rounded-md"
+                      className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md`}
                       style={{ backgroundColor: theme.colors.border }}
                     />
                   )}
@@ -222,61 +299,111 @@ function ProductCarousel({
               ) : p.image ? (
                 <img
                   src={p.image}
-                  alt={p.title}
-                  className="h-24 w-full rounded-md object-cover"
+                  alt={isActive ? p.title : ""}
+                  className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md object-contain`}
+                  loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <div
-                  className="h-24 w-full rounded-md"
+                  className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md`}
                   style={{ backgroundColor: theme.colors.border }}
                 />
               )}
-              <div className="min-w-0 flex-1">
-                {url ? (
+              <div className="min-h-0 min-w-0 flex-1">
+                {url && isActive ? (
                   <a
                     href={url}
-                    className="block text-sm font-medium leading-snug hover:underline line-clamp-2"
+                    className="line-clamp-2 block text-sm font-medium leading-snug hover:underline focus-visible:ring-2"
                     style={{ color: theme.colors.text }}
                   >
                     {p.title}
                   </a>
                 ) : (
-                  <p className="line-clamp-2 text-sm font-medium leading-snug" style={{ color: theme.colors.text }}>
+                  <p
+                    className="line-clamp-2 text-sm font-medium leading-snug"
+                    style={{ color: theme.colors.text }}
+                  >
                     {p.title}
                   </p>
                 )}
                 <p className="mt-0.5 text-xs font-semibold" style={{ color: theme.colors.primary }}>
                   {formatPrice(p.price)}
                 </p>
+                {p.description?.trim() && (
+                  <p
+                    className={
+                      layout === "masked"
+                        ? "mt-2 line-clamp-3 text-xs leading-relaxed"
+                        : "mt-3 line-clamp-5 text-sm leading-relaxed"
+                    }
+                    style={{ color: theme.colors.muted }}
+                  >
+                    {p.description.trim()}
+                  </p>
+                )}
               </div>
-              <div className="flex flex-col gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onAddToCart(p, true)}
-                  disabled={paused}
-                  className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-40"
-                  style={{ backgroundColor: theme.colors.primary }}
-                >
-                  {theme.copy.buy}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAddToCart(p, false)}
-                  disabled={paused}
-                  className="rounded-md border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
-                  style={{
-                    borderColor: theme.colors.primary,
-                    color: theme.colors.primary,
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  {theme.copy.addToCart}
-                </button>
-              </div>
-            </div>
+              {isActive && (
+                <div className="mt-auto flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onAddToCart(p, true)}
+                    disabled={isAddingToCart}
+                    className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                    style={{ backgroundColor: theme.colors.primary }}
+                  >
+                    {theme.copy.buy}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAddToCart(p, false)}
+                    disabled={isAddingToCart}
+                    className="rounded-md border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                    style={{
+                      borderColor: theme.colors.primary,
+                      color: theme.colors.primary,
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    {theme.copy.addToCart}
+                  </button>
+                </div>
+              )}
+            </article>
           );
         })}
       </div>
+      {products.length > 1 && (
+        <div className="flex items-center justify-center gap-2" aria-label="Controles do carrossel">
+          <button
+            type="button"
+            onClick={() => move(-1)}
+            aria-label="Produto anterior"
+            className="flex size-10 items-center justify-center rounded-full border text-lg focus-visible:ring-2"
+            style={{ borderColor: theme.colors.border, color: theme.colors.primary }}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={() => setRotationPaused((paused) => !paused)}
+            aria-label={rotationPaused ? "Retomar rotação" : "Pausar rotação"}
+            className="flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-semibold focus-visible:ring-2"
+            style={{ borderColor: theme.colors.border, color: theme.colors.primary }}
+          >
+            {rotationPaused ? "▶" : "Ⅱ"}
+          </button>
+          <button
+            type="button"
+            onClick={() => move(1)}
+            aria-label="Próximo produto"
+            className="flex size-10 items-center justify-center rounded-full border text-lg focus-visible:ring-2"
+            style={{ borderColor: theme.colors.border, color: theme.colors.primary }}
+          >
+            ›
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -286,8 +413,10 @@ export default function SearchRecoveryOverlay({
   onClose,
   theme: themeConfig,
   variant = "popup",
+  carouselLayout,
 }: SearchRecoveryOverlayProps) {
   const theme = resolveTheme(themeConfig);
+  const resolvedCarouselLayout = carouselLayout ?? (variant === "popup" ? "masked" : "wide");
   const cssVars = themeToCssVars(theme);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [flow, setFlow] = useState<FlowState>({ status: "loading" });
@@ -295,29 +424,56 @@ export default function SearchRecoveryOverlay({
   const [thinking, setThinking] = useState(false);
   const sessionRef = useRef<string | null>(null);
   const closedRef = useRef(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const scrollTermRef = useRef(term);
+  const initialResponsePendingRef = useRef(true);
   // Carrinho real (Shopify via server fn) — "Comprar"/"Adicionar" adicionam de verdade.
   const addToCart = useAddToCart();
   const { cart } = useCart();
-  // Timer de reengajamento (30s de inatividade → nova mensagem + som)
+  // Timer de reengajamento (1 min de inatividade → nova mensagem + som)
   const reengageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
 
-  // Scrolla para a última mensagem
+  // Uma nova busca começa no topo; respostas posteriores acompanham o fim do chat.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, flow]);
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    if (scrollTermRef.current !== term) {
+      scrollTermRef.current = term;
+      initialResponsePendingRef.current = true;
+      container.scrollTop = 0;
+      return;
+    }
+
+    const latestMessage = messages.at(-1);
+    if (initialResponsePendingRef.current) {
+      container.scrollTop = 0;
+      if (latestMessage?.role === "agent") initialResponsePendingRef.current = false;
+      return;
+    }
+
+    if (latestMessage?.role === "agent") container.scrollTop = container.scrollHeight;
+  }, [messages, term]);
 
   // Abre a conversa automaticamente quando o overlay monta (zero results)
   useEffect(() => {
     let cancelled = false;
+    initialResponsePendingRef.current = true;
+    sessionRef.current = null;
+    setMessages([]);
     setFlow({ status: "loading" });
 
     const start = async () => {
-      const result = (await invoke.site.loaders.searchRecovery({
-        query: term,
-        action: "search_recovery",
-      })) as RecoveryResult | null;
+      let result: RecoveryResult | null = null;
+      try {
+        result = (await invoke.site.loaders.searchRecovery({
+          query: term,
+          action: "search_recovery",
+        })) as RecoveryResult | null;
+      } catch {
+        // A mensagem de fallback abaixo mantém o chat recuperável.
+      }
 
       if (cancelled || closedRef.current) return;
       if (!result) {
@@ -328,6 +484,7 @@ export default function SearchRecoveryOverlay({
           },
         ]);
         setFlow({ status: "chat" });
+        lastActivityRef.current = Date.now();
         return;
       }
 
@@ -341,6 +498,7 @@ export default function SearchRecoveryOverlay({
         },
       ]);
       setFlow({ status: "chat" });
+      lastActivityRef.current = Date.now();
       // Instrumentação (Fase C): exposição da Recova com os produtos reais.
       track({
         event: "recova_exposed",
@@ -366,8 +524,7 @@ export default function SearchRecoveryOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [term]);
 
-  // Reengajamento: após 30s de inatividade, envia nova mensagem + som.
-  // O chat NUNCA encerra sozinho — continua enquanto a aba estiver aberta.
+  // Reengajamento: no máximo 2 mensagens, separadas por 1 minuto.
   useEffect(() => {
     if (flow.status !== "chat" || closedRef.current) return;
 
@@ -375,20 +532,23 @@ export default function SearchRecoveryOverlay({
       if (reengageTimerRef.current) clearTimeout(reengageTimerRef.current);
       reengageTimerRef.current = setTimeout(async () => {
         if (closedRef.current || flow.status !== "chat") return;
+        if (getReengagementDelay(lastActivityRef.current) > 0) {
+          schedule();
+          return;
+        }
         const sessionId = sessionRef.current;
         if (!sessionId) return;
+        let exhausted = false;
         try {
           const result = (await invoke.site.loaders.searchRecovery({
             session_id: sessionId,
             action: "reengage",
-          })) as { message?: string } | null;
+          })) as { message?: string; exhausted?: boolean } | null;
+          exhausted = result?.exhausted ?? false;
           if (closedRef.current) return;
           if (result?.message) {
             playAlertSound();
-            setMessages((prev) => [
-              ...prev,
-              { role: "agent", text: result.message! },
-            ]);
+            setMessages((prev) => [...prev, { role: "agent", text: result.message! }]);
             // Instrumentação (Fase C): reengajamento.
             track({
               event: "recova_reengaged",
@@ -399,9 +559,8 @@ export default function SearchRecoveryOverlay({
         } catch {
           // reengajamento é best-effort — nunca quebra o chat
         }
-        // agenda o próximo ciclo (30s)
-        schedule();
-      }, 30_000);
+        if (!exhausted) schedule();
+      }, getReengagementDelay(lastActivityRef.current));
     };
 
     schedule();
@@ -413,14 +572,9 @@ export default function SearchRecoveryOverlay({
 
   // Cliente comprou uma sugestão → adiciona ao carrinho REAL (Shopify).
   // "Comprar" adiciona e vai ao checkout; "Adicionar ao carrinho" só adiciona.
-  const handleAddToCart = (
-    product: RecoveryProduct,
-    goToCheckout: boolean,
-  ) => {
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text: `Quero comprar: ${product.title}` },
-    ]);
+  const handleAddToCart = (product: RecoveryProduct, goToCheckout: boolean) => {
+    lastActivityRef.current = Date.now();
+    setMessages((prev) => [...prev, { role: "user", text: `Quero comprar: ${product.title}` }]);
     if (!product.variant_id) {
       setMessages((prev) => [
         ...prev,
@@ -461,6 +615,18 @@ export default function SearchRecoveryOverlay({
             price: product.price,
           });
           if (goToCheckout) {
+            const checkoutUrl = cartState.checkoutUrl;
+            if (!checkoutUrl) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "agent",
+                  text: "O item foi adicionado, mas não consegui abrir o checkout. Você pode finalizar pela sacola.",
+                },
+              ]);
+              setFlow({ status: "chat" });
+              return;
+            }
             // Instrumentação (Fase C): checkout iniciado — distingue venda
             // real de carrinho abandonado no dashboard. Emitido no clique
             // "Comprar" (intenção de finalizar), antes da navegação.
@@ -471,11 +637,8 @@ export default function SearchRecoveryOverlay({
               product_id: product.id,
               price: product.price,
             });
-            const checkoutUrl = cartState?.checkoutUrl;
-            if (checkoutUrl) {
-              window.location.href = checkoutUrl;
-              return;
-            }
+            window.location.href = checkoutUrl;
+            return;
           }
           setFlow({ status: "success" });
         },
@@ -500,35 +663,45 @@ export default function SearchRecoveryOverlay({
     if (!text || thinking) return;
     setInput("");
     setThinking(true);
+    lastActivityRef.current = Date.now();
 
     setMessages((prev) => [...prev, { role: "user", text }]);
 
     const sessionId = sessionRef.current;
-    if (!sessionId) {
+    let result: RecoveryResult | null = null;
+    try {
+      result = (await invoke.site.loaders.searchRecovery(
+        sessionId
+          ? {
+              session_id: sessionId,
+              user_response: text,
+              action: "converse",
+            }
+          : {
+              query: text,
+              action: "search_recovery",
+            },
+      )) as RecoveryResult | null;
+    } catch {
+      // O erro visível abaixo evita deixar a mensagem do cliente sem resposta.
+    } finally {
       setThinking(false);
-      return;
     }
 
-    const result = (await invoke.site.loaders.searchRecovery({
-      session_id: sessionId,
-      user_response: text,
-      action: "converse",
-    })) as RecoveryResult | null;
-
-    setThinking(false);
     if (closedRef.current) return;
-
     if (!result) {
       setMessages((prev) => [
         ...prev,
         {
           role: "agent",
-          text: "Não consegui encontrar uma opção confiável agora. Você pode tentar outra busca.",
+          text: "Ainda não consegui acessar as recomendações. Tente enviar sua mensagem novamente em instantes.",
         },
       ]);
       return;
     }
 
+    sessionRef.current = result.session_id;
+    lastActivityRef.current = Date.now();
     setMessages((prev) => [
       ...prev,
       {
@@ -541,7 +714,7 @@ export default function SearchRecoveryOverlay({
     // Instrumentação (Fase C): refinamento iniciado.
     track({
       event: "recova_refinement_started",
-      session_id: sessionId,
+      session_id: result.session_id,
       interaction_type: "refinement",
       products_shown: result.products.length,
     });
@@ -560,20 +733,30 @@ export default function SearchRecoveryOverlay({
   };
 
   const isSuccess = flow.status === "success";
+  const latestProductMessageIndex = messages.reduce(
+    (latest, message, index) =>
+      message.role === "agent" && message.products?.length ? index : latest,
+    -1,
+  );
 
-  // Conteúdo do diálogo (compartilhado entre popup e inline).
+  // Conteúdo compartilhado entre o popup e a seção inline.
   const dialog = (
     <div
-      role="dialog"
-      aria-modal={variant === "popup"}
+      role={variant === "popup" ? "dialog" : "region"}
+      aria-modal={variant === "popup" ? true : undefined}
       aria-label={theme.copy.dialogAria}
-      className={`relative flex w-full flex-col overflow-hidden rounded-lg bg-white border ${
-        variant === "inline" ? "max-w-full" : "mx-3 mb-3 max-w-md sm:mb-0 shadow-2xl"
-      } ${isSuccess ? "ring-2" : ""}`}
+      className={`relative flex w-full flex-col overflow-hidden bg-white ${
+        variant === "inline"
+          ? "max-w-full rounded-md border"
+          : `mx-3 mb-3 max-w-md rounded-xl shadow-2xl sm:mb-0 ${isSuccess ? "ring-2" : ""}`
+      }`}
       style={{
         fontFamily: theme.fonts.body,
-        borderColor: theme.colors.border,
-        ...(isSuccess ? { boxShadow: `0 0 0 2px ${theme.colors.success}` } : {}),
+        ...(variant === "inline"
+          ? { borderColor: isSuccess ? theme.colors.success : theme.colors.border }
+          : isSuccess
+            ? { boxShadow: `0 0 0 2px ${theme.colors.success}` }
+            : {}),
       }}
     >
       {/* Header — identidade Recova limpa: apenas o logo wordmark. */}
@@ -591,18 +774,22 @@ export default function SearchRecoveryOverlay({
             className="h-6 w-auto object-contain"
           />
         </div>
-        <button
-          type="button"
-          onClick={close}
-          aria-label={theme.copy.closeAria}
-          className="flex size-8 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20"
-        >
-          ✕
-        </button>
+        {variant === "popup" && (
+          <button
+            type="button"
+            onClick={close}
+            aria-label={theme.copy.closeAria}
+            className="flex size-8 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* Corpo */}
       <div
+        ref={messagesContainerRef}
+        data-chat-scroll
         className="flex max-h-[50vh] min-h-40 flex-col gap-3 overflow-y-auto p-4"
         style={{ backgroundColor: theme.colors.surface }}
       >
@@ -669,6 +856,9 @@ export default function SearchRecoveryOverlay({
                   products={msg.products}
                   theme={theme}
                   onAddToCart={handleAddToCart}
+                  isAddingToCart={addToCart.isPending}
+                  autoPlay={i === latestProductMessageIndex}
+                  layout={resolvedCarouselLayout}
                   onProductClick={(p) => {
                     // Instrumentação (Fase C): clique em alternativa.
                     track({
@@ -685,10 +875,9 @@ export default function SearchRecoveryOverlay({
           </div>
         ))}
 
-        {/* Chips de refinamento dinâmicos vindos do backend (última mensagem do agente) */}
+        {/* Mantém os últimos chips acionáveis durante mensagens de reengajamento. */}
         {(() => {
-          const lastAgent = [...messages].reverse().find((m) => m.role === "agent");
-          const chips = lastAgent?.role === "agent" ? lastAgent.refinementOptions : undefined;
+          const chips = getLatestRefinementOptions(messages);
           if (!chips || chips.length === 0 || isSuccess) return null;
           return (
             <div
@@ -699,7 +888,7 @@ export default function SearchRecoveryOverlay({
               }}
             >
               <p className="text-sm font-bold" style={{ color: theme.colors.text }}>
-                Continuar refinando:
+                O que você prefere?
               </p>
               <div className="flex flex-wrap gap-2">
                 {chips.map((chip) => (
@@ -741,8 +930,6 @@ export default function SearchRecoveryOverlay({
             Obrigado! Sua compra foi registrada.
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input (escondido no estado terminal) */}
@@ -757,7 +944,10 @@ export default function SearchRecoveryOverlay({
         >
           <input
             value={input}
-            onChange={(e) => setInput(e.currentTarget.value)}
+            onChange={(e) => {
+              lastActivityRef.current = Date.now();
+              setInput(e.currentTarget.value);
+            }}
             placeholder={theme.copy.inputPlaceholder}
             className="grow rounded-md border px-3 py-2 text-sm outline-none"
             style={{
@@ -780,7 +970,7 @@ export default function SearchRecoveryOverlay({
       {/* Powered by Recova (free tier) — apenas "Powered by" + logo wordmark. */}
       {theme.showRecovaBranding && (
         <a
-          href={theme.copy.poweredByUrl ?? "https://recova.app"}
+          href={theme.copy.poweredByUrl ?? "https://recova.gabrielsacilotto.com.br/"}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-1.5 border-t px-3 py-2 text-2xs hover:opacity-80"

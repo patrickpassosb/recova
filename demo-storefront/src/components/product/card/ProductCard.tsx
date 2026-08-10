@@ -122,9 +122,7 @@ export default function ProductCard({
 
         {(percent > 0 || !inStock) && (
           <div className="absolute top-3 left-3 z-10">
-            <Tag className={!inStock ? "" : "bg-secondary text-white"}>
-              {!inStock ? "Esgotado" : `${percent}% off`}
-            </Tag>
+            <Tag>{!inStock ? "Esgotado" : `${percent}% off`}</Tag>
           </div>
         )}
       </div>

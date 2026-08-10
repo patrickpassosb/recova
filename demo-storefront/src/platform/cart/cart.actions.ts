@@ -26,6 +26,7 @@ export const addItemServerFn = createServerFn({ method: "POST" })
       requestHeaders: request.headers,
       responseHeaders: response.headers,
     });
+    if (!cart) throw new Error("Shopify não retornou o carrinho atualizado");
     return shopifyCartToCartState(cart);
   });
 

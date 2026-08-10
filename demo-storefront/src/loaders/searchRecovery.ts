@@ -14,6 +14,8 @@ export interface RecoveryProduct {
   title: string;
   /** Handle do produto — para linkar à página do produto (/products/:slug). */
   handle?: string | null;
+  /** Descrição em texto puro cadastrada no Shopify. */
+  description?: string | null;
   price: number;
   image: string | null;
   score: number;
@@ -116,13 +118,7 @@ export interface Props {
   /** Resposta do cliente (para converse) */
   user_response?: string;
   /** Ação: search_recovery | converse | reengage | analyze | dashboard | track_event */
-  action?:
-    | "search_recovery"
-    | "converse"
-    | "reengage"
-    | "analyze"
-    | "dashboard"
-    | "track_event";
+  action?: "search_recovery" | "converse" | "reengage" | "analyze" | "dashboard" | "track_event";
   /** Payload do evento (para track_event) */
   event?: Record<string, unknown>;
 }

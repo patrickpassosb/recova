@@ -12,109 +12,136 @@
  */
 import { createTool } from "@decocms/runtime/tools";
 import { z } from "zod";
-import type { Env } from "../types/env.ts";
 import { chat, extractJson, LlmError } from "../lib/llm.ts";
 import {
-  deriveCatalogCategories,
-  extractMaxPrice,
-  fetchCatalog,
-  findCategoryForTerms,
-  isStopword,
-  lexicalSearch,
-  normalize,
-  popularProducts,
-  toProductOutput,
-  type CatalogCategory,
-  type CatalogProduct,
-  type ScoredProduct,
-} from "../lib/shopify.ts";
-import {
-  addMessage,
-  addSuggestedProducts,
-  createSession,
-  getSession,
-  pruneSessions,
-  touchSession,
+	addMessage,
+	addSuggestedProducts,
+	createSession,
+	getSession,
+	pruneSessions,
+	touchSession,
 } from "../lib/sessions.ts";
+import {
+	type CatalogCategory,
+	type CatalogProduct,
+	deriveCatalogCategories,
+	extractMaxPrice,
+	fetchCatalog,
+	findCategoryForTerms,
+	isStopword,
+	lexicalSearch,
+	normalize,
+	popularProducts,
+	type ScoredProduct,
+	toProductOutput,
+} from "../lib/shopify.ts";
+import type { Env } from "../types/env.ts";
 
 export const SEARCH_RECOVERY_RESOURCE_URI = "ui://mcp-app/search-recovery";
 
 export const searchRecoveryInputSchema = z.object({
-  query: z
-    .string()
-    .min(1)
-    .max(200)
-    .refine((q) => q.trim().length > 0, { message: "Query não pode ser vazia" })
-    .describe("Termo livre digitado pelo cliente na busca (pode ter typos, preço, categoria)"),
-  session_id: z
-    .string()
-    .optional()
-    .describe("ID de sessão existente para continuar a conversa (opcional)"),
+	query: z
+		.string()
+		.min(1)
+		.max(200)
+		.refine((q) => q.trim().length > 0, { message: "Query não pode ser vazia" })
+		.describe(
+			"Termo livre digitado pelo cliente na busca (pode ter typos, preço, categoria)",
+		),
+	session_id: z
+		.string()
+		.optional()
+		.describe("ID de sessão existente para continuar a conversa (opcional)"),
 });
 
 export type SearchRecoveryInput = z.infer<typeof searchRecoveryInputSchema>;
 
 export const searchRecoveryOutputSchema = z.object({
-  session_id: z.string().describe("ID da sessão — use nas tools converse/reengage"),
-  products: z
-    .array(
-      z.object({
-        id: z.string(),
-        title: z.string(),
-        handle: z.string().optional().describe("Handle do produto — para linkar à página do produto"),
-        price: z.number(),
-        image: z.string().nullable(),
-        score: z.number(),
-        match_type: z.enum(["MATCH", "PARTIAL"]),
-        variant_id: z.string().nullable().optional().describe("MerchantId para adicionar ao carrinho"),
-      }),
-    )
-    .describe("3+ produtos relevantes do catálogo (nunca inventados)"),
-  explanation: z.string().describe("Explicação do porquê estes produtos foram escolhidos"),
-  follow_up_question: z.string().describe("Pergunta de refinamento para o cliente"),
-  refinement_options: z
-    .array(z.string())
-    .optional()
-    .describe("2-4 opções de refinamento (chips) relevantes à query — ex.: ['Casual', 'Esportivo', 'Dia a dia']"),
+	session_id: z
+		.string()
+		.describe("ID da sessão — use nas tools converse/reengage"),
+	products: z
+		.array(
+			z.object({
+				id: z.string(),
+				title: z.string(),
+				handle: z
+					.string()
+					.optional()
+					.describe("Handle do produto — para linkar à página do produto"),
+				description: z
+					.string()
+					.nullable()
+					.describe("Descrição em texto puro cadastrada no Shopify"),
+				price: z.number(),
+				image: z.string().nullable(),
+				score: z.number(),
+				match_type: z.enum(["MATCH", "PARTIAL"]),
+				variant_id: z
+					.string()
+					.nullable()
+					.optional()
+					.describe("MerchantId para adicionar ao carrinho"),
+			}),
+		)
+		.describe("3+ produtos relevantes do catálogo (nunca inventados)"),
+	explanation: z
+		.string()
+		.describe("Explicação do porquê estes produtos foram escolhidos"),
+	follow_up_question: z
+		.string()
+		.describe("Pergunta de refinamento para o cliente"),
+	refinement_options: z
+		.array(z.string())
+		.optional()
+		.describe(
+			"2-4 opções de refinamento (chips) relevantes à query — ex.: ['Casual', 'Esportivo', 'Dia a dia']",
+		),
 });
 
 export type SearchRecoveryOutput = z.infer<typeof searchRecoveryOutputSchema>;
 
 interface Intent {
-  terms: string[];
-  category: string | null;
-  max_price: number | null;
+	terms: string[];
+	category: string | null;
+	max_price: number | null;
+}
+
+function isGreetingQuery(query: string): boolean {
+	return /^(oi+|ol[aá]|hello|hi|hey|bom dia|boa tarde|boa noite)[!?.\s]*$/i.test(
+		query.trim(),
+	);
+}
+
+function greetingOptions(categories: CatalogCategory[]): string[] {
+	const options = categories.map((category) => category.label).filter(Boolean);
+	return [...new Set(options)].slice(0, 4);
 }
 
 /** Prompt dinâmico com as categorias reais do catálogo da loja. */
 function intentSystemPrompt(categories: CatalogCategory[]): string {
-  const hint = categories.map((c) => c.label.toLowerCase()).join(", ");
-  return [
-    "Você é o motor de entendimento de intenção de busca de uma loja de e-commerce.",
-    `O catálogo desta loja tem: ${hint}.`,
-    "Receba a query do cliente (em português, pode ter typos e regionalismos) e responda APENAS com JSON:",
-    '{"terms": ["termos de busca em INGLÊS, separados"], "category": "categoria ou null", "max_price": número ou null, "refinement_options": ["2-4 opções curtas em português para continuar refinando"]}',
-    "Regras:",
-    "- terms: 2 a 6 termos em inglês que casem com os tipos de produto ACIMA (não invente tipos fora da lista).",
-    "- refinement_options: 2 a 4 opções contextuais (ex.: query de calçado → ['Casual', 'Esportivo', 'Dia a dia']; query de adesivo → ['Programação', 'Comunidade', 'Frases']).",
-    "- Se a query tem preço ('até 300', 'até R$ 300'), coloque o número em max_price.",
-    "- category: 'sticker', 'camiseta', 'moletom', 'caneca', 'mochila', 'garrafa', 'boné', 'caderno', 'bolsa', 'calçado', 'acessório' ou null.",
-    "- NUNCA afirme cor, material ou atributo que não exista no catálogo.",
-    "- NÃO invente produtos. Só devolva o JSON.",
-  ].join("\n");
+	const hint = categories.map((c) => c.label.toLowerCase()).join(", ");
+	return [
+		"Você é o motor de entendimento de intenção de busca de uma loja de e-commerce.",
+		`O catálogo desta loja tem: ${hint}.`,
+		"Receba a query do cliente (em português, pode ter typos e regionalismos) e responda APENAS com JSON:",
+		'{"terms": ["termos de busca em INGLÊS, separados"], "category": "categoria ou null", "max_price": número ou null, "refinement_options": ["2-4 opções curtas em português para continuar refinando"]}',
+		"Regras:",
+		"- terms: 2 a 6 termos em inglês que casem com os tipos de produto ACIMA (não invente tipos fora da lista).",
+		"- refinement_options: 2 a 4 opções contextuais (ex.: query de calçado → ['Casual', 'Esportivo', 'Dia a dia']; query de adesivo → ['Programação', 'Comunidade', 'Frases']).",
+		"- Se a query tem preço ('até 300', 'até R$ 300'), coloque o número em max_price.",
+		"- category: 'sticker', 'camiseta', 'moletom', 'caneca', 'mochila', 'garrafa', 'boné', 'caderno', 'bolsa', 'calçado', 'acessório' ou null.",
+		"- NUNCA afirme cor, material ou atributo que não exista no catálogo.",
+		"- NÃO invente produtos. Só devolva o JSON.",
+	].join("\n");
 }
 
 function fallbackIntent(query: string): Intent {
-  const maxPrice = extractMaxPrice(query);
-  const terms = normalize(query)
-    .split(" ")
-    .filter(
-      (t) =>
-        t.length > 1 &&
-        !isStopword(t) &&
-        !/^\d+$/.test(t),
-    );
-  return { terms, category: null, max_price: maxPrice ?? null };
+	const maxPrice = extractMaxPrice(query);
+	const terms = normalize(query)
+		.split(" ")
+		.filter((t) => t.length > 1 && !isStopword(t) && !/^\d+$/.test(t));
+	return { terms, category: null, max_price: maxPrice ?? null };
 }
 
 /**
@@ -127,264 +154,297 @@ function fallbackIntent(query: string): Intent {
  * o caller deve clarificar em vez de afirmar "encontrei".
  */
 function combinedSearch(
-  catalog: CatalogProduct[],
-  intent: Intent,
-  query: string,
-  maxPrice: number | undefined,
+	catalog: CatalogProduct[],
+	intent: Intent,
+	query: string,
+	maxPrice: number | undefined,
 ): { results: ScoredProduct[]; lowConfidence: boolean } {
-  const llmResults = lexicalSearch(catalog, intent.terms, maxPrice);
-  const rawTerms = fallbackIntent(query).terms;
-  const lexicalResults = lexicalSearch(catalog, rawTerms, maxPrice);
+	const llmResults = lexicalSearch(catalog, intent.terms, maxPrice);
+	const rawTerms = fallbackIntent(query).terms;
+	const lexicalResults = lexicalSearch(catalog, rawTerms, maxPrice);
 
-  const byId = new Map<string, ScoredProduct>();
-  for (const r of [...llmResults, ...lexicalResults]) {
-    const existing = byId.get(r.product.id);
-    if (!existing || r.score > existing.score) byId.set(r.product.id, r);
-  }
-  const merged = [...byId.values()].sort(
-    (a, b) => b.score - a.score || a.product.price - b.product.price,
-  );
+	const byId = new Map<string, ScoredProduct>();
+	for (const r of [...llmResults, ...lexicalResults]) {
+		const existing = byId.get(r.product.id);
+		if (!existing || r.score > existing.score) byId.set(r.product.id, r);
+	}
+	const merged = [...byId.values()].sort(
+		(a, b) => b.score - a.score || a.product.price - b.product.price,
+	);
 
-  // Filtro de ruído: 1 hit solto (prefixo acidental) não é relevância.
-  // Se o filtro deixar menos de 3 produtos, relaxa para garantir o mínimo.
-  const filtered = merged.filter((r) => r.score >= 0.1);
-  const results = filtered.length >= 3 ? filtered : merged;
+	// Filtro de ruído: 1 hit solto (prefixo acidental) não é relevância.
+	// Se o filtro deixar menos de 3 produtos, relaxa para garantir o mínimo.
+	const filtered = merged.filter((r) => r.score >= 0.1);
+	const results = filtered.length >= 3 ? filtered : merged;
 
-  // Cobertura do melhor resultado sobre os termos crus: baixa cobertura com
-  // query multi-token = falso positivo (ex.: "camisa do flamengo" → só o
-  // sinônimo camisa casou). Sinaliza para clarificar em vez de afirmar.
-  const rawTermCount = fallbackIntent(query).terms.length;
-  const bestCoverage = results.reduce(
-    (max, r) => Math.max(max, r.rawCoverage),
-    0,
-  );
-  const lowConfidence =
-    rawTermCount > 1 && bestCoverage < 0.6 && results.length > 0;
+	// Cobertura do melhor resultado sobre os termos crus: baixa cobertura com
+	// query multi-token = falso positivo (ex.: "camisa do flamengo" → só o
+	// sinônimo camisa casou). Sinaliza para clarificar em vez de afirmar.
+	const rawTermCount = fallbackIntent(query).terms.length;
+	const bestCoverage = results.reduce(
+		(max, r) => Math.max(max, r.rawCoverage),
+		0,
+	);
+	const lowConfidence =
+		rawTermCount > 1 && bestCoverage < 0.6 && results.length > 0;
 
-  return { results, lowConfidence };
+	return { results, lowConfidence };
 }
 
 const INTENT_CACHE_TTL_MS = 10 * 60_000;
 const intentCache = new Map<string, { at: number; intent: IntentResult }>();
 
 interface IntentResult extends Intent {
-  refinement_options: string[];
+	refinement_options: string[];
 }
 
 async function understandIntent(
-  query: string,
-  categories: CatalogCategory[],
+	query: string,
+	categories: CatalogCategory[],
 ): Promise<IntentResult> {
-  const key = normalize(query);
-  const hit = intentCache.get(key);
-  if (hit && Date.now() - hit.at < INTENT_CACHE_TTL_MS) {
-    return { ...hit.intent };
-  }
+	const key = normalize(query);
+	const hit = intentCache.get(key);
+	if (hit && Date.now() - hit.at < INTENT_CACHE_TTL_MS) {
+		return { ...hit.intent };
+	}
 
-  let intent: Intent | null = null;
-  let options: string[] = [];
-  try {
-    const raw = await chat(
-      [
-        { role: "system", content: intentSystemPrompt(categories) },
-        { role: "user", content: `Query do cliente: "${query}"` },
-      ],
-      { maxTokens: 700, temperature: 0 },
-    );
-    const parsed = extractJson<{
-      terms?: unknown;
-      category?: unknown;
-      max_price?: unknown;
-      refinement_options?: unknown;
-    }>(raw);
-    if (parsed && Array.isArray(parsed.terms) && parsed.terms.length > 0) {
-      intent = {
-        terms: parsed.terms.slice(0, 6).map(String),
-        category: typeof parsed.category === "string" ? parsed.category : null,
-        max_price:
-          typeof parsed.max_price === "number" && parsed.max_price > 0
-            ? parsed.max_price
-            : null,
-      };
-      if (Array.isArray(parsed.refinement_options)) {
-        options = parsed.refinement_options
-          .filter((o): o is string => typeof o === "string" && o.length > 0)
-          .slice(0, 4);
-      }
-    }
-  } catch (err) {
-    if (err instanceof LlmError) {
-      console.warn(`[search_recovery] LLM indisponível, fallback lexical: ${err.message}`);
-    }
-  }
+	let intent: Intent | null = null;
+	let options: string[] = [];
+	try {
+		const raw = await chat(
+			[
+				{ role: "system", content: intentSystemPrompt(categories) },
+				{ role: "user", content: `Query do cliente: "${query}"` },
+			],
+			{ maxTokens: 700, temperature: 0 },
+		);
+		const parsed = extractJson<{
+			terms?: unknown;
+			category?: unknown;
+			max_price?: unknown;
+			refinement_options?: unknown;
+		}>(raw);
+		if (parsed && Array.isArray(parsed.terms) && parsed.terms.length > 0) {
+			intent = {
+				terms: parsed.terms.slice(0, 6).map(String),
+				category: typeof parsed.category === "string" ? parsed.category : null,
+				max_price:
+					typeof parsed.max_price === "number" && parsed.max_price > 0
+						? parsed.max_price
+						: null,
+			};
+			if (Array.isArray(parsed.refinement_options)) {
+				options = parsed.refinement_options
+					.filter((o): o is string => typeof o === "string" && o.length > 0)
+					.slice(0, 4);
+			}
+		}
+	} catch (err) {
+		if (err instanceof LlmError) {
+			console.warn(
+				`[search_recovery] LLM indisponível, fallback lexical: ${err.message}`,
+			);
+		}
+	}
 
-  const final: IntentResult = {
-    ...(intent ?? fallbackIntent(query)),
-    refinement_options: options.length >= 2 ? options : ["Mais barato", "Mais caro"],
-  };
-  intentCache.set(key, { at: Date.now(), intent: final });
-  return { ...final };
+	const final: IntentResult = {
+		...(intent ?? fallbackIntent(query)),
+		refinement_options:
+			options.length >= 2 ? options : ["Mais barato", "Mais caro"],
+	};
+	intentCache.set(key, { at: Date.now(), intent: final });
+	return { ...final };
 }
 
-function pickProducts(results: ScoredProduct[], excludeIds: string[]): ScoredProduct[] {
-  const fresh = results.filter((r) => !excludeIds.includes(r.product.id));
-  const pool = fresh.length >= 3 ? fresh : results;
-  return pool.slice(0, 5);
+function pickProducts(
+	results: ScoredProduct[],
+	excludeIds: string[],
+): ScoredProduct[] {
+	const fresh = results.filter((r) => !excludeIds.includes(r.product.id));
+	const pool = fresh.length >= 3 ? fresh : results;
+	return pool.slice(0, 5);
 }
 
 function buildExplanation(
-  query: string,
-  products: ScoredProduct[],
-  intent: Intent,
+	query: string,
+	products: ScoredProduct[],
+	intent: Intent,
 ): string {
-  const names = products.slice(0, 3).map((p) => p.product.title).join(", ");
-  const priceNote =
-    intent.max_price != null
-      ? ` dentro do limite de R$ ${intent.max_price}`
-      : "";
-  return (
-    `Entendi que você procura "${query}". Encontrei no catálogo${priceNote}: ` +
-    `${names}.`
-  );
+	const names = products
+		.slice(0, 3)
+		.map((p) => p.product.title)
+		.join(", ");
+	const priceNote =
+		intent.max_price != null
+			? ` dentro do limite de R$ ${intent.max_price}`
+			: "";
+	return (
+		`Entendi que você procura "${query}". Encontrei no catálogo${priceNote}: ` +
+		`${names}.`
+	);
 }
 
 function buildLowConfidenceExplanation(query: string): string {
-  return (
-    `Não tenho certeza se encontrei exatamente o que você quer com "${query}". ` +
-    `Encontrei algumas opções que talvez sirvam — me diga se alguma se aproxima:`
-  );
+	return (
+		`Não tenho certeza se encontrei exatamente o que você quer com "${query}". ` +
+		`Encontrei algumas opções que talvez sirvam — me diga se alguma se aproxima:`
+	);
 }
 
 function buildBestsellerExplanation(query: string): string {
-  return (
-    `Não encontrei nada com "${query}" no catálogo, mas estes são os produtos ` +
-    `mais populares da loja. Talvez um deles te interesse:`
-  );
+	return (
+		`Não encontrei nada com "${query}" no catálogo, mas estes são os produtos ` +
+		`mais populares da loja. Talvez um deles te interesse:`
+	);
+}
+
+function buildGreetingExplanation(): string {
+	return "Oi! Separei algumas opções da loja para você começar.";
+}
+
+function buildGreetingFollowUp(): string {
+	return "Como posso ajudar? Me diga o tipo de produto, estilo ou faixa de preço que você procura.";
 }
 
 function buildFollowUp(products: ScoredProduct[]): string {
-  const first = products[0]?.product;
-  if (!first) return "O que exatamente você está procurando?";
-  return (
-    `Algum desses te atende? Se quiser, me conta: você prefere ${first.title} ` +
-    `ou está buscando outra faixa de preço / estilo?`
-  );
+	const first = products[0]?.product;
+	if (!first) return "O que exatamente você está procurando?";
+	return (
+		`Algum desses te atende? Se quiser, me conta: você prefere ${first.title} ` +
+		`ou está buscando outra faixa de preço / estilo?`
+	);
 }
 
 export const searchRecoveryTool = (_env: Env) =>
-  createTool({
-    id: "search_recovery",
-    description:
-      "Recupera vendas perdidas: quando a busca nativa retorna zero resultados, entende a intenção do cliente e devolve 3+ produtos relevantes do catálogo com explicação e pergunta de refinamento.",
-    inputSchema: searchRecoveryInputSchema,
-    outputSchema: searchRecoveryOutputSchema,
-    _meta: { ui: { resourceUri: SEARCH_RECOVERY_RESOURCE_URI } },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    execute: async ({ context }) => {
-      const { query, session_id } = context as SearchRecoveryInput;
-      pruneSessions();
+	createTool({
+		id: "search_recovery",
+		description:
+			"Recupera vendas perdidas: quando a busca nativa retorna zero resultados, entende a intenção do cliente e devolve 3+ produtos relevantes do catálogo com explicação e pergunta de refinamento.",
+		inputSchema: searchRecoveryInputSchema,
+		outputSchema: searchRecoveryOutputSchema,
+		_meta: { ui: { resourceUri: SEARCH_RECOVERY_RESOURCE_URI } },
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: false,
+			openWorldHint: false,
+		},
+		execute: async ({ context }) => {
+			const { query, session_id } = context as SearchRecoveryInput;
+			pruneSessions();
 
-      const session = session_id ? getSession(session_id) : undefined;
-      const activeSession = session ?? createSession(query);
-      if (session) touchSession(session.id);
+			const session = session_id ? getSession(session_id) : undefined;
+			const activeSession = session ?? createSession(query);
+			if (session) touchSession(session.id);
 
-      const catalog = await fetchCatalog();
-      const categories = deriveCatalogCategories(catalog);
-      const intent = await understandIntent(query, categories);
+			const catalog = await fetchCatalog();
+			const categories = deriveCatalogCategories(catalog);
+			const greeting = isGreetingQuery(query);
+			const intent = greeting
+				? {
+						terms: [],
+						category: null,
+						max_price: null,
+						refinement_options: greetingOptions(categories),
+					}
+				: await understandIntent(query, categories);
 
-      const maxPrice = intent.max_price ?? extractMaxPrice(query);
-      const { results, lowConfidence } = combinedSearch(
-        catalog,
-        intent,
-        query,
-        maxPrice ?? undefined,
-      );
+			const maxPrice = intent.max_price ?? extractMaxPrice(query);
+			const { results, lowConfidence } = combinedSearch(
+				catalog,
+				intent,
+				query,
+				maxPrice ?? undefined,
+			);
 
-      let explanation: string;
-      let followUp: string;
-      let chosen: ScoredProduct[];
+			let explanation: string;
+			let followUp: string;
+			let chosen: ScoredProduct[];
 
-      if (lowConfidence) {
-        // Cobertura fraca → clarificar em vez de afirmar "encontrei"
-        chosen = results.slice(0, 5);
-        explanation = buildLowConfidenceExplanation(query);
-        followUp = buildFollowUp(chosen);
-      } else if (results.length === 0) {
-        // Nada no catálogo → recupera com bestsellers (respeitando o teto de
-        // preço, se houver — não estoura o orçamento do cliente).
-        const bestsellers = popularProducts(catalog, 5)
-          .filter((p) => maxPrice === undefined || p.price <= maxPrice);
-        chosen = bestsellers.map((p) => ({
-          product: p,
-          score: 0,
-          matchType: "PARTIAL" as const,
-          rawHits: 0,
-          rawTermCount: 0,
-          rawCoverage: 0,
-        }));
-        explanation = buildBestsellerExplanation(query);
-        followUp = buildFollowUp(chosen);
-      } else {
-        chosen = results;
-        explanation = buildExplanation(query, chosen, intent);
-        followUp = buildFollowUp(chosen);
-      }
+			if (greeting) {
+				chosen = popularProducts(catalog, 5).map((product) => ({
+					product,
+					score: 0,
+					matchType: "PARTIAL" as const,
+					rawHits: 0,
+					rawTermCount: 0,
+					rawCoverage: 0,
+				}));
+				explanation = buildGreetingExplanation();
+				followUp = buildGreetingFollowUp();
+			} else if (lowConfidence) {
+				// Cobertura fraca → clarificar em vez de afirmar "encontrei"
+				chosen = results.slice(0, 5);
+				explanation = buildLowConfidenceExplanation(query);
+				followUp = buildFollowUp(chosen);
+			} else if (results.length === 0) {
+				// Nada no catálogo → recupera com bestsellers (respeitando o teto de
+				// preço, se houver — não estoura o orçamento do cliente).
+				const bestsellers = popularProducts(catalog, 5).filter(
+					(p) => maxPrice === undefined || p.price <= maxPrice,
+				);
+				chosen = bestsellers.map((p) => ({
+					product: p,
+					score: 0,
+					matchType: "PARTIAL" as const,
+					rawHits: 0,
+					rawTermCount: 0,
+					rawCoverage: 0,
+				}));
+				explanation = buildBestsellerExplanation(query);
+				followUp = buildFollowUp(chosen);
+			} else {
+				chosen = results;
+				explanation = buildExplanation(query, chosen, intent);
+				followUp = buildFollowUp(chosen);
+			}
 
-      const products = pickProducts(chosen, activeSession.suggestedProductIds);
-      // Decisão da reunião 09/08: NÃO encher linguiça. Se a busca só achou 1
-      // produto relevante, mostra 1 — não completa com bestsellers aleatórios
-      // só para bater o mínimo. O padding abaixo só completa com produtos da
-      // MESMA família do pedido (relevantes), nunca com bestsellers soltos.
-      let finalProducts = products;
-      let padded = false;
-      if (finalProducts.length < 3) {
-        const seen = new Set(finalProducts.map((p) => p.product.id));
-        for (const id of activeSession.suggestedProductIds) seen.add(id);
-        const cat = findCategoryForTerms(categories, intent.terms);
-        const padTerms = cat?.terms ?? intent.terms;
-        const pad = lexicalSearch(catalog, padTerms)
-          .filter((r) => !seen.has(r.product.id))
-          .filter((r) => maxPrice === undefined || r.product.price <= maxPrice)
-          .slice(0, 5 - finalProducts.length)
-          .map((r) => ({
-            product: r.product,
-            score: 0,
-            matchType: "PARTIAL" as const,
-            rawHits: 0,
-            rawTermCount: 0,
-            rawCoverage: 0,
-          }));
-        finalProducts = [...finalProducts, ...pad].slice(0, 5);
-        padded = pad.length > 0;
-      }
-      // Se houve padding, a explicação precisa refletir o retorno real
-      // (senão diz "Encontrei: X, Y" mas devolve 5 produtos).
-      if (padded && !lowConfidence && results.length > 0) {
-        explanation = buildExplanation(query, finalProducts, intent);
-      }
-      addSuggestedProducts(
-        activeSession,
-        finalProducts.map((p) => p.product.id),
-      );
+			const products = pickProducts(chosen, activeSession.suggestedProductIds);
+			// Decisão da reunião 09/08: NÃO encher linguiça. Se a busca só achou 1
+			// produto relevante, mostra 1 — não completa com bestsellers aleatórios
+			// só para bater o mínimo. O padding abaixo só completa com produtos da
+			// MESMA família do pedido (relevantes), nunca com bestsellers soltos.
+			let finalProducts = products;
+			let padded = false;
+			if (finalProducts.length < 3) {
+				const seen = new Set(finalProducts.map((p) => p.product.id));
+				for (const id of activeSession.suggestedProductIds) seen.add(id);
+				const cat = findCategoryForTerms(categories, intent.terms);
+				const padTerms = cat?.terms ?? intent.terms;
+				const pad = lexicalSearch(catalog, padTerms)
+					.filter((r) => !seen.has(r.product.id))
+					.filter((r) => maxPrice === undefined || r.product.price <= maxPrice)
+					.slice(0, 5 - finalProducts.length)
+					.map((r) => ({
+						product: r.product,
+						score: 0,
+						matchType: "PARTIAL" as const,
+						rawHits: 0,
+						rawTermCount: 0,
+						rawCoverage: 0,
+					}));
+				finalProducts = [...finalProducts, ...pad].slice(0, 5);
+				padded = pad.length > 0;
+			}
+			// Se houve padding, a explicação precisa refletir o retorno real
+			// (senão diz "Encontrei: X, Y" mas devolve 5 produtos).
+			if (padded && !lowConfidence && results.length > 0) {
+				explanation = buildExplanation(query, finalProducts, intent);
+			}
+			addSuggestedProducts(
+				activeSession,
+				finalProducts.map((p) => p.product.id),
+			);
 
-      addMessage(activeSession, "user", query);
-      addMessage(
-        activeSession,
-        "assistant",
-        `${explanation}\n${followUp}`,
-      );
+			addMessage(activeSession, "user", query);
+			addMessage(activeSession, "assistant", `${explanation}\n${followUp}`);
 
-      return {
-        session_id: activeSession.id,
-        products: finalProducts.map(toProductOutput),
-        explanation,
-        follow_up_question: followUp,
-        refinement_options: intent.refinement_options,
-      };
-    },
-  });
+			return {
+				session_id: activeSession.id,
+				products: finalProducts.map(toProductOutput),
+				explanation,
+				follow_up_question: followUp,
+				refinement_options: intent.refinement_options,
+			};
+		},
+	});

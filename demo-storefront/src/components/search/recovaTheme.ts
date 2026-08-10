@@ -110,7 +110,7 @@ export const recovaDefaultTheme: RecovaTheme = {
     closeAria: "Fechar",
     dialogAria: "Recova — assistente de busca",
     recoveryPrefix: "Resultados para",
-    poweredByUrl: "https://recova.app",
+    poweredByUrl: "https://recova.gabrielsacilotto.com.br/",
   },
   showRecovaBranding: true,
 };

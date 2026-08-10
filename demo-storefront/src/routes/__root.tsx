@@ -1,6 +1,14 @@
-import { createRootRouteWithContext } from "@tanstack/react-router";
+import { useEffect } from "react";
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  ScriptOnce,
+  Scripts,
+} from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
-import { DecoRootLayout } from "@decocms/tanstack";
+import { NavigationProgress, StableOutlet } from "@decocms/tanstack";
+import { LiveControls } from "@decocms/blocks/hooks";
+import { ANALYTICS_SCRIPT } from "@decocms/blocks/sdk/analytics";
 import { CART_QUERY_KEY, getCartServerFn } from "../platform/cart";
 import { getUserServerFn, USER_QUERY_KEY } from "../platform/user";
 import MinicartDrawer from "../components/minicart/MinicartDrawer";
@@ -53,11 +61,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "preconnect", href: "https://api.fontshare.com" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap",
+        href: "https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700&display=swap",
       },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico" },
@@ -66,10 +73,67 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   component: RootLayout,
 });
 
+// Mirrors `DecoRootLayout`'s bootstrap: sets up `DECO.events` before hydration
+// so sections can dispatch analytics events during their first render.
+// Copied from `buildDecoEventsBootstrap` in @decocms/tanstack@7.20.7
+// (src/hooks/DecoRootLayout.tsx), as is the 500ms `deco:ready` timeout in
+// `RootLayout` below — keep both in sync when bumping that package.
+const DECO_EVENTS_BOOTSTRAP = `
+window.__RUNTIME__ = window.__RUNTIME__ || { account: "" };
+window.DECO = window.DECO || {};
+window.DECO.events = window.DECO.events || {
+  _q: [],
+  _subs: [],
+  dispatch: function(e) {
+    this._q.push(e);
+    for (var i = 0; i < this._subs.length; i++) {
+      try { this._subs[i](e); } catch(err) { console.error('[DECO.events]', err); }
+    }
+  },
+  subscribe: function(fn) {
+    this._subs.push(fn);
+    for (var i = 0; i < this._q.length; i++) {
+      try { fn(this._q[i]); } catch(err) {}
+    }
+  }
+};
+window.dataLayer = window.dataLayer || [];
+`;
+
+/**
+ * Composed from the individual pieces `DecoRootLayout` documents as its escape
+ * hatch, instead of using `DecoRootLayout` itself: that component wraps the
+ * outlet in a bare `<main>`, which would both nest the Header/Footer landmarks
+ * inside `main` and collide with the `<main id="main-content">` that
+ * `PageSections` emits around the CMS page content (two `main` landmarks is an
+ * axe `landmark-unique` violation). Here the outlet is a plain `<div>`, so the
+ * page's own `<main>` is the only one.
+ */
 function RootLayout() {
+  useEffect(() => {
+    const id = setTimeout(() => {
+      (window as unknown as { __deco_ready?: boolean }).__deco_ready = true;
+      document.dispatchEvent(new Event("deco:ready"));
+    }, 500);
+    return () => clearTimeout(id);
+  }, []);
+
   return (
-    <DecoRootLayout lang="en" siteName="demo-storefront">
-      <MinicartDrawer />
-    </DecoRootLayout>
+    <html lang="en" data-theme="light" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body className="bg-base-200 text-base-content" suppressHydrationWarning>
+        <ScriptOnce children={DECO_EVENTS_BOOTSTRAP} />
+        <NavigationProgress />
+        <div>
+          <StableOutlet />
+        </div>
+        <MinicartDrawer />
+        <LiveControls site="demo-storefront" />
+        <ScriptOnce children={ANALYTICS_SCRIPT} />
+        <Scripts />
+      </body>
+    </html>
   );
 }

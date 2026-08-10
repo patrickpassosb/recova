@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { cmsHomeRouteConfig, DecoPageRenderer, loadCmsPage } from "@decocms/tanstack";
+import { cmsHomeRouteConfig, loadCmsPage } from "@decocms/tanstack";
 import { deferredSectionLoader } from "@decocms/tanstack/sdk/deferredSectionLoader";
+import PageSections from "../components/ui/PageSections";
 import { preloadSectionComponents } from "@decocms/blocks/cms";
 
 const isServer = typeof document === "undefined";
@@ -76,7 +77,7 @@ function HomePage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Storefront-tanstack</h1>
+          <h1 className="text-4xl font-bold mb-4">Boas-vindas às capivaras da demo! 🌿</h1>
           <p className="text-sm text-base-content/40 mt-2">No CMS page found for /</p>
         </div>
       </div>
@@ -84,12 +85,13 @@ function HomePage() {
   }
 
   return (
-    <DecoPageRenderer
+    <PageSections
       sections={data.resolvedSections ?? []}
       deferredSections={data.deferredSections ?? []}
       deferredPromises={data.deferredPromises}
       pagePath={data.pagePath}
       pageUrl={data.pageUrl}
+      device={data.device}
       loadDeferredSectionFn={deferredSectionLoader}
     />
   );

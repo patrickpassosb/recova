@@ -22,7 +22,7 @@ const MOBILE_ICON_CLASS =
 function SignIn({ variant }: Props) {
   const { isAuthenticated } = useUser();
   const href = isAuthenticated ? "/account" : "/login";
-  const label = isAuthenticated ? "Conta" : "Entrar";
+  const label = isAuthenticated ? "Account" : "Sign in";
 
   if (variant === "mobile") {
     return (

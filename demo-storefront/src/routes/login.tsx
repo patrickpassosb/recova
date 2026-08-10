@@ -19,7 +19,7 @@ function LoginPage() {
 
   if (isAuthenticated) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <main id="main-content" className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="card bg-base-100 shadow w-full max-w-md p-8 text-center">
           <h1 className="text-2xl font-semibold mb-2">You're signed in</h1>
           <p className="text-base-content/70 mb-6">Head to your account dashboard to keep going.</p>
@@ -27,7 +27,7 @@ function LoginPage() {
             Go to my account
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -64,7 +64,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4 py-10">
+    <main id="main-content" className="min-h-[60vh] flex items-center justify-center px-4 py-10">
       <div className="card bg-base-100 shadow w-full max-w-md p-8">
         {view !== "recover" && (
           <div role="tablist" className="tabs tabs-bordered mb-6">
@@ -270,6 +270,6 @@ function LoginPage() {
           </Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

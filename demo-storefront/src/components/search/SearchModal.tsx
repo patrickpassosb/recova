@@ -139,16 +139,11 @@ export default function SearchModal({
   const [term, setTerm] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
-  const [recoveryTerm, setRecoveryTerm] = useState<string | null>(null);
-  // Termos que o usuário fechou manualmente — não reabrir automaticamente
+  const [inlineRecoveryTerm, setInlineRecoveryTerm] = useState<string | null>(null);
   const dismissedTermsRef = useRef<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  // Timer de 10s: se não houver recomendações ao digitar, o agente aparece
-  // inline (embaixo da barra de busca) — decisão da reunião 09/08.
-  const inlineRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [inlineRecoveryTerm, setInlineRecoveryTerm] = useState<string | null>(null);
 
   // Open with Cmd+K / Ctrl+K, close with Escape.
   useEffect(() => {
@@ -171,8 +166,6 @@ export default function SearchModal({
       inputRef.current?.focus();
       return () => triggerRef.current?.focus();
     }
-    // Ao fechar, limpa o timer de agente inline e o estado.
-    if (inlineRecoveryTimerRef.current) clearTimeout(inlineRecoveryTimerRef.current);
     setInlineRecoveryTerm(null);
   }, [open]);
 
@@ -227,22 +220,13 @@ export default function SearchModal({
     if (!open || !query) {
       setProducts([]);
       setLoading(false);
-      if (inlineRecoveryTimerRef.current) clearTimeout(inlineRecoveryTimerRef.current);
       setInlineRecoveryTerm(null);
       return;
     }
+
     let cancelled = false;
     setLoading(true);
-    // Timer de 10s: se não houver recomendações ao digitar, o agente aparece
-    // inline (embaixo da barra de busca) — decisão da reunião 09/08.
-    if (inlineRecoveryTimerRef.current) clearTimeout(inlineRecoveryTimerRef.current);
-    inlineRecoveryTimerRef.current = setTimeout(() => {
-      if (cancelled || !open) return;
-      // Só aciona se ainda não há sugestões e o termo não foi dispensado.
-      if (!dismissedTermsRef.current.has(query)) {
-        setInlineRecoveryTerm(query);
-      }
-    }, 10_000);
+    setInlineRecoveryTerm(null);
     const timer = setTimeout(async () => {
       try {
         const result = (await invoke.site.loaders.searchSuggestions({
@@ -250,15 +234,17 @@ export default function SearchModal({
           count: SUGGESTION_COUNT,
         })) as { products?: Product[] } | null;
         if (!cancelled) {
-          setProducts(result?.products ?? []);
-          // Se apareceram sugestões, cancela o agente inline.
-          if ((result?.products?.length ?? 0) > 0) {
-            if (inlineRecoveryTimerRef.current) clearTimeout(inlineRecoveryTimerRef.current);
-            setInlineRecoveryTerm(null);
-          }
+          const nextProducts = result?.products ?? [];
+          setProducts(nextProducts);
+          setInlineRecoveryTerm(
+            nextProducts.length === 0 && !dismissedTermsRef.current.has(query) ? query : null,
+          );
         }
       } catch {
-        if (!cancelled) setProducts([]);
+        if (!cancelled) {
+          setProducts([]);
+          setInlineRecoveryTerm(null);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -276,25 +262,9 @@ export default function SearchModal({
     // `dispatch` exists at runtime (framework's DECO.events bootstrap) but the
     // ambient Window.DECO type only declares `subscribe`.
     const events = window.DECO?.events as unknown as
-      { dispatch?: (event: unknown) => void } | undefined;
+      | { dispatch?: (event: unknown) => void }
+      | undefined;
     events?.dispatch?.({ name: "search", params: { search_term: query } });
-
-    // Zero resultados → agente de recuperação entra SÓ após o Enter
-    // (não enquanto digita). Termos fechados manualmente não reabrem.
-    if (dismissedTermsRef.current.has(query)) return;
-    invoke.site.loaders.searchSuggestions({ query, count: SUGGESTION_COUNT })
-      .then((result) => {
-        const products = (result as { products?: Product[] } | null)?.products;
-        if (!products || products.length === 0) {
-          // Zero resultados → a Recova entra em fluxo. Fecha o modal de busca
-          // para não sobrepor o overlay (feedback da Gabrielly).
-          setOpen(false);
-          setRecoveryTerm(query);
-        }
-      })
-      .catch(() => {
-        // sem sugestões → não abre a Recova
-      });
   };
 
   // The mobile trigger lives inside the frosted header bar, and a non-`none`
@@ -377,13 +347,12 @@ export default function SearchModal({
           )}
         </div>
 
-        {/* Agente inline: aparece embaixo da barra de busca após ~10s sem
-            recomendações (decisão da reunião 09/08). Não é pop-up. */}
         {inlineRecoveryTerm && (
           <div className="border-t pt-3" style={{ borderColor: "rgba(0,0,0,0.1)" }}>
             <SearchRecoveryOverlay
               term={inlineRecoveryTerm}
               variant="inline"
+              carouselLayout="masked"
               onClose={() => {
                 dismissedTermsRef.current.add(inlineRecoveryTerm);
                 setInlineRecoveryTerm(null);
@@ -420,16 +389,6 @@ export default function SearchModal({
       )}
 
       {overlay && createPortal(overlay, document.body)}
-      {recoveryTerm && (
-        <SearchRecoveryOverlay
-          term={recoveryTerm}
-          variant="inline"
-          onClose={() => {
-            dismissedTermsRef.current.add(recoveryTerm);
-            setRecoveryTerm(null);
-          }}
-        />
-      )}
     </>
   );
 }

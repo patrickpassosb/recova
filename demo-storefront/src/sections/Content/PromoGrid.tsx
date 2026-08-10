@@ -29,7 +29,14 @@ export interface Props {
   tabs: PromoTab[];
 }
 
-function Card({ label, headline, cta = "Shop Now", href, image, index = 0 }: PromoCard & { index?: number }) {
+function Card({
+  label,
+  headline,
+  cta = "Shop Now",
+  href,
+  image,
+  index = 0,
+}: PromoCard & { index?: number }) {
   const ref = useReveal<HTMLAnchorElement>();
   return (
     <Link
@@ -51,7 +58,8 @@ function Card({ label, headline, cta = "Shop Now", href, image, index = 0 }: Pro
 
       <span className="relative text-sm font-medium text-white">{label}</span>
 
-      <span className="relative text-xl font-semibold text-white sm:text-2xl">{headline}</span>
+      {/* h3: nested under the grid's h2 heading, keeping the outline h2 -> h3. */}
+      <h3 className="relative text-xl font-semibold text-white sm:text-2xl">{headline}</h3>
 
       <span className="relative text-sm font-medium text-white">{cta}</span>
     </Link>
@@ -69,7 +77,9 @@ export default function PromoGrid({ title, tabs = [] }: Props) {
   return (
     <div className="flex flex-col items-center gap-6 px-3 py-8 sm:py-14">
       {title && (
-        <h2 className="max-w-xl text-center text-display font-medium text-ink sm:text-3xl">{title}</h2>
+        <h2 className="max-w-xl text-center text-display font-medium text-ink sm:text-3xl">
+          {title}
+        </h2>
       )}
 
       {tabs.length > 1 && (
@@ -81,7 +91,7 @@ export default function PromoGrid({ title, tabs = [] }: Props) {
               onClick={() => setActiveIndex(index)}
               className={clx(
                 "tap-scale rounded-sm px-4 py-2 text-sm font-medium transition-colors duration-(--duration-fast)",
-                index === activeIndex ? "bg-primary text-white" : "frost text-ink-soft",
+                index === activeIndex ? "bg-ink text-white" : "frost text-ink-soft",
               )}
             >
               {tab.label}

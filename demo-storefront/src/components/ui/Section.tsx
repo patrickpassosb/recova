@@ -21,7 +21,7 @@ function Header({ title, cta }: Props) {
       <h2 className="text-display font-medium text-ink">{title}</h2>
       {cta && (
         <a
-          className="tap-scale flex items-center gap-1 text-sm font-semibold text-primary transition-colors duration-(--duration-fast) hover:opacity-80"
+          className="tap-scale flex items-center gap-1 text-sm text-ink-soft transition-colors duration-(--duration-fast) hover:text-ink"
           href={cta}
         >
           See all
@@ -44,10 +44,7 @@ function Container({ className: _class, ...props }: React.JSX.IntrinsicElements[
   return (
     <div
       {...props}
-      className={clx(
-        "flex w-full flex-col gap-6 px-3 py-8 sm:py-14",
-        _class?.toString(),
-      )}
+      className={clx("flex w-full flex-col gap-6 px-3 py-8 sm:py-14", _class?.toString())}
     />
   );
 }

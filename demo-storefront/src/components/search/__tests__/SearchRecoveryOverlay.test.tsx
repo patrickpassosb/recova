@@ -1,7 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach } from "bun:test";
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import SearchRecoveryOverlay from "../SearchRecoveryOverlay.tsx";
+import SearchRecoveryOverlay, {
+  getLatestRefinementOptions,
+  getReengagementDelay,
+} from "../SearchRecoveryOverlay.tsx";
 
 /**
  * Component tests for the SearchRecoveryOverlay — the conversational overlay
@@ -21,6 +24,7 @@ describe("SearchRecoveryOverlay", () => {
       {
         id: "gid://1",
         title: "High Top Canvas Shoes",
+        description: "Tênis de lona confortável para o dia a dia.",
         price: 120,
         image: null,
         score: 0.8,
@@ -32,6 +36,11 @@ describe("SearchRecoveryOverlay", () => {
     follow_up_question: "Prefere casual ou esportivo?",
     refinement_options: ["Casual", "Esportivo"],
   };
+
+  it("restarts the reengagement wait after recent activity", () => {
+    expect(getReengagementDelay(10_000, 40_000)).toBe(30_000);
+    expect(getReengagementDelay(10_000, 70_000)).toBe(0);
+  });
 
   beforeEach(() => {
     globalThis.fetch = (async (input: any) => {
@@ -50,7 +59,11 @@ describe("SearchRecoveryOverlay", () => {
     globalThis.fetch = originalFetch;
   });
 
-  function renderOverlay(props?: { onClose?: () => void }) {
+  function renderOverlay(props?: {
+    onClose?: () => void;
+    variant?: "popup" | "inline";
+    carouselLayout?: "masked" | "wide";
+  }) {
     const qc = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -85,9 +98,40 @@ describe("SearchRecoveryOverlay", () => {
     });
   });
 
-  it("closes via the header close button and calls onClose", async () => {
+  it("restarts recovery from the user's message when the initial session failed", async () => {
+    let invokeCalls = 0;
+    globalThis.fetch = (async (input: any) => {
+      if (!String(input).includes("/deco/invoke/")) {
+        throw new Error(`Unexpected fetch in component test: ${input}`);
+      }
+      invokeCalls++;
+      return new Response(JSON.stringify(invokeCalls === 1 ? null : agentResult), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    renderOverlay({ variant: "inline" });
+    await waitFor(() => expect(screen.getByText(/Não consegui encontrar uma opção/i)).toBeTruthy());
+
+    fireEvent.change(screen.getByPlaceholderText("Responda ao assistente..."), {
+      target: { value: "quero um tenis" },
+    });
+    fireEvent.click(screen.getByText("Enviar"));
+
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    expect(screen.getByText("High Top Canvas Shoes")).toBeTruthy();
+  });
+
+  it("does not render a close button in inline mode", async () => {
+    renderOverlay({ variant: "inline" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    expect(screen.queryByLabelText("Fechar")).toBeNull();
+  });
+
+  it("keeps a functional close button in popup mode", async () => {
     let closed = false;
-    renderOverlay({ onClose: () => (closed = true) });
+    renderOverlay({ variant: "popup", onClose: () => (closed = true) });
     await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
     // There are two elements labelled "Fechar" (backdrop + header button);
     // the header button is the one that closes.
@@ -103,12 +147,183 @@ describe("SearchRecoveryOverlay", () => {
     expect(screen.getByText("Adicionar ao carrinho")).toBeTruthy();
   });
 
-  it("renders the product carousel with auto-play track", async () => {
+  it("keeps purchase actions enabled while carousel autoplay is paused", async () => {
+    renderOverlay({ variant: "inline" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+
+    const card = document.querySelector("[data-card]");
+    const carousel = card?.parentElement?.parentElement;
+    const buyButton = screen.getByText("Comprar") as HTMLButtonElement;
+    const addButton = screen.getByText("Adicionar ao carrinho") as HTMLButtonElement;
+
+    expect(carousel).toBeTruthy();
+    fireEvent.mouseEnter(carousel!);
+    expect(buyButton.disabled).toBe(false);
+    expect(addButton.disabled).toBe(false);
+    fireEvent.touchStart(carousel!);
+    expect(buyButton.disabled).toBe(false);
+    expect(addButton.disabled).toBe(false);
+  });
+
+  it("keeps the latest actionable chips through agent messages without options", () => {
+    expect(
+      getLatestRefinementOptions([
+        { role: "agent", refinementOptions: ["Casual", "Esportivo"] },
+        { role: "user" },
+        { role: "agent" },
+      ]),
+    ).toEqual(["Casual", "Esportivo"]);
+
+    expect(
+      getLatestRefinementOptions([
+        { role: "agent", refinementOptions: ["Casual", "Esportivo"] },
+        { role: "agent" },
+        { role: "agent", refinementOptions: ["Mais barato", "Premium"] },
+      ]),
+    ).toEqual(["Mais barato", "Premium"]);
+  });
+
+  it('labels refinement choices as "O que você prefere?"', async () => {
+    renderOverlay({ variant: "inline" });
+    await waitFor(() => expect(screen.getByText("O que você prefere?")).toBeTruthy());
+  });
+
+  it("renders products in an accessible coverflow carousel", async () => {
     renderOverlay();
     await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
-    // The carousel track is the scrollable container holding the product card.
-    const track = document.querySelector("[data-card]")?.parentElement;
-    expect(track).toBeTruthy();
-    expect(track?.className).toContain("overflow-x-auto");
+    expect(screen.getByRole("region", { name: "Produtos recomendados" })).toBeTruthy();
+    expect(document.querySelector("[data-card]")).toBeTruthy();
+  });
+
+  it("uses the requested masked and wide Coverflow layouts", async () => {
+    const masked = renderOverlay({ variant: "inline", carouselLayout: "masked" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    const maskedCarousel = screen.getByRole("region", { name: "Produtos recomendados" });
+    expect(maskedCarousel.getAttribute("data-carousel-layout")).toBe("masked");
+    expect(maskedCarousel.querySelector("[data-card]")?.className).toContain("h-[22rem] w-60");
+
+    masked.unmount();
+    renderOverlay({ variant: "inline", carouselLayout: "wide" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    const wideCarousel = screen.getByRole("region", { name: "Produtos recomendados" });
+    expect(wideCarousel.getAttribute("data-carousel-layout")).toBe("wide");
+    expect(wideCarousel.querySelector("[data-card]")?.className).toContain("h-[27.5rem] w-80");
+  });
+
+  it("shows Shopify product descriptions in compact and wide layouts", async () => {
+    const masked = renderOverlay({ variant: "inline", carouselLayout: "masked" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    expect(screen.getByText("Tênis de lona confortável para o dia a dia.").className).toContain(
+      "line-clamp-3",
+    );
+
+    masked.unmount();
+    renderOverlay({ variant: "inline", carouselLayout: "wide" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    expect(screen.getByText("Tênis de lona confortável para o dia a dia.").className).toContain(
+      "line-clamp-5",
+    );
+  });
+
+  it("starts each recovery at the top of the chat", async () => {
+    let resolveInitial!: (response: Response) => void;
+    globalThis.fetch = (() =>
+      new Promise<Response>((resolve) => {
+        resolveInitial = resolve;
+      })) as typeof fetch;
+
+    renderOverlay({ variant: "inline", carouselLayout: "masked" });
+    const chat = document.querySelector("[data-chat-scroll]") as HTMLDivElement;
+    chat.scrollTop = 240;
+
+    resolveInitial(
+      new Response(JSON.stringify(agentResult), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    expect(chat.scrollTop).toBe(0);
+  });
+
+  it("scrolls only after a subsequent agent response", async () => {
+    let invokeCalls = 0;
+    let resolveReply!: (response: Response) => void;
+    globalThis.fetch = ((input: RequestInfo | URL) => {
+      if (!String(input).includes("/deco/invoke/")) {
+        throw new Error(`Unexpected fetch in component test: ${input}`);
+      }
+      invokeCalls++;
+      if (invokeCalls === 1) {
+        return Promise.resolve(
+          new Response(JSON.stringify(agentResult), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return new Promise<Response>((resolve) => {
+        resolveReply = resolve;
+      });
+    }) as typeof fetch;
+
+    renderOverlay({ variant: "inline", carouselLayout: "masked" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    const chat = document.querySelector("[data-chat-scroll]") as HTMLDivElement;
+    Object.defineProperty(chat, "scrollHeight", { configurable: true, value: 900 });
+    chat.scrollTop = 120;
+
+    fireEvent.change(screen.getByPlaceholderText("Responda ao assistente..."), {
+      target: { value: "quero outro modelo" },
+    });
+    fireEvent.click(screen.getByText("Enviar"));
+    await waitFor(() => expect(screen.getByText("quero outro modelo")).toBeTruthy());
+    expect(chat.scrollTop).toBe(120);
+
+    resolveReply(
+      new Response(
+        JSON.stringify({
+          ...agentResult,
+          explanation: "Encontrei uma nova opção para você.",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await waitFor(() => expect(screen.getByText(/nova opção/i)).toBeTruthy());
+    expect(chat.scrollTop).toBe(900);
+  });
+
+  it("selects a visible side card when clicked", async () => {
+    globalThis.fetch = (async (input: any) => {
+      if (!String(input).includes("/deco/invoke/")) {
+        throw new Error(`Unexpected fetch in component test: ${input}`);
+      }
+      return new Response(
+        JSON.stringify({
+          ...agentResult,
+          products: [
+            agentResult.products[0],
+            { ...agentResult.products[0], id: "gid://2", title: "Canvas Slip-On" },
+            { ...agentResult.products[0], id: "gid://3", title: "Running Sneakers" },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    renderOverlay({ variant: "inline", carouselLayout: "wide" });
+    await waitFor(() => expect(screen.getByLabelText("Selecionar Canvas Slip-On")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Selecionar Canvas Slip-On"));
+    expect(screen.queryByLabelText("Selecionar Canvas Slip-On")).toBeNull();
+    expect(screen.getByLabelText("Selecionar High Top Canvas Shoes")).toBeTruthy();
+  });
+
+  it("links the footer Recova logo to the landing page", async () => {
+    renderOverlay({ variant: "inline" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+    const branding = screen.getByRole("link", { name: /Powered by Recova/i });
+    expect(branding.getAttribute("href")).toBe("https://recova.gabrielsacilotto.com.br/");
   });
 });

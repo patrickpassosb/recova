@@ -1,4 +1,8 @@
+import Section from "../../components/ui/Section";
+
 export { default, loader } from "../../components/search/SearchResult";
+
+export const LoadingFallback = () => <Section.Placeholder height="635px" />;
 
 // Eager so the section stays mounted across URL changes (filter/sort/page).
 // Deferred sections re-resolve by propsHash and remount with a page-wide

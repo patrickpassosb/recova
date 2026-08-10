@@ -135,7 +135,9 @@ function Links(props: Props) {
         {header?.description && <p style={{ color: header.textColor }}>{header?.description}</p>}
       </header>
 
-      <main className="w-full">
+      {/* A plain `<div>`, not a `<main>`: this is a CMS section and an editor can place it on
+          any page, where `PageSections` already provides the page's single `<main>` landmark. */}
+      <div className="w-full">
         <ul className="flex flex-col justify-center items-center gap-4">
           {links?.items?.map((link) => (
             <li className="w-full">
@@ -154,7 +156,7 @@ function Links(props: Props) {
             </li>
           ))}
         </ul>
-      </main>
+      </div>
 
       <footer className="flex flex-1 flex-col">
         <ul className="flex flex-row gap-4 mb-10 justify-center items-center">

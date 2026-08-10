@@ -4,16 +4,16 @@
   name: "light";
   default: true;
   color-scheme: light;
-  --color-primary: #155EEF;
-  --color-secondary: #F97316;
-  --color-accent: #F97316;
-  --color-neutral: #1D2939;
+  --color-primary: #0a0a0a;
+  --color-secondary: #f0f0f0;
+  --color-accent: #e5e5e5;
+  --color-neutral: #171717;
   --color-base-100: #ffffff;
-  --color-base-200: #F4F7FA;
+  --color-base-200: #ffffff;
   --color-base-300: #e5e5e5;
-  --color-info: #155EEF;
-  --color-success: #16A34A;
-  --color-warning: #F97316;
+  --color-info: #2e72d2;
+  --color-success: #008060;
+  --color-warning: #b45309;
   --color-error: #c0362c;
 }
 
@@ -30,8 +30,7 @@
   --color-transparent: transparent;
   --color-current: currentColor;
   --color-inherit: inherit;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Switzer", ui-sans-serif, system-ui, sans-serif;
 
   /* Gray scale (Tailwind v3 default, required for bg-gray-*, text-gray-*, etc.) */
   --color-gray-50: #fafafa;

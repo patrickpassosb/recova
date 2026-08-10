@@ -13,15 +13,15 @@ function AccountPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <main id="main-content" className="min-h-[60vh] flex items-center justify-center">
         <span className="loading loading-spinner loading-lg" />
-      </div>
+      </main>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <main id="main-content" className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="card bg-base-100 shadow w-full max-w-md p-8 text-center">
           <h1 className="text-2xl font-semibold mb-2">You're not signed in</h1>
           <p className="text-base-content/70 mb-6">Sign in to view your account details.</p>
@@ -29,12 +29,12 @@ function AccountPage() {
             Go to sign in
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-10">
+    <main id="main-content" className="container mx-auto px-4 py-10">
       <h1 className="text-3xl font-semibold mb-2">My account</h1>
       <p className="text-base-content/70 mb-8">
         Welcome back{user?.givenName ? `, ${user.givenName}` : ""}.
@@ -70,6 +70,6 @@ function AccountPage() {
       </div>
 
       <AddressBook />
-    </div>
+    </main>
   );
 }

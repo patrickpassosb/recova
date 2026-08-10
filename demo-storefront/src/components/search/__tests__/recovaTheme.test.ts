@@ -19,7 +19,9 @@ describe("recovaTheme resolveTheme", () => {
   });
 
   it("deep-merges fonts over the default", () => {
-    const theme = resolveTheme({ fonts: { ...recovaDefaultTheme.fonts, display: "Comic Sans MS" } });
+    const theme = resolveTheme({
+      fonts: { ...recovaDefaultTheme.fonts, display: "Comic Sans MS" },
+    });
     expect(theme.fonts.display).toBe("Comic Sans MS");
     expect(theme.fonts.body).toBe(recovaDefaultTheme.fonts.body);
   });

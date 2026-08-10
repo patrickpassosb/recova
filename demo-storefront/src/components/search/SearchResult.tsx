@@ -1,7 +1,7 @@
 import type { ProductListingPage } from "@decocms/apps-commerce/types";
 import { BreadcrumbJsonLd, PLPJsonLd } from "@decocms/blocks/hooks";
 import { mapProductToAnalyticsItem } from "@decocms/apps-commerce/utils/productToAnalyticsItem";
-import { useId, useRef, useState, useEffect } from "react";
+import { useEffect, useId } from "react";
 import { useOffer } from "@decocms/apps-commerce/sdk/useOffer";
 import { useRouterState } from "@tanstack/react-router";
 import { useSendEvent } from "../../sdk/useSendEvent";
@@ -16,25 +16,18 @@ import SearchResultGridSkeleton from "./SearchResultGridSkeleton";
 import SearchSortBar from "./SearchSortBar";
 import { invoke } from "../../runtime";
 
-/**
- * Emite um evento real de instrumentação (Fase C — dashboard 100% dados
- * reais). Best-effort: nunca quebra o fluxo se falhar.
- */
 function track(event: Record<string, unknown>): void {
-  invoke.site.loaders
-    .searchRecovery({ action: "track_event", event })
-    .catch(() => {
-      // instrumentação é best-effort
-    });
+  invoke.site.loaders.searchRecovery({ action: "track_event", event }).catch(() => {
+    // Instrumentação é best-effort e não interfere na busca.
+  });
 }
 
-/** Hash simples de uma query (para o query_hash do schema). */
 function hashQuery(query: string): string {
-  let h = 0;
-  for (let i = 0; i < query.length; i++) {
-    h = (h * 31 + query.charCodeAt(i)) | 0;
+  let hash = 0;
+  for (let index = 0; index < query.length; index++) {
+    hash = (hash * 31 + query.charCodeAt(index)) | 0;
   }
-  return (h >>> 0).toString(16);
+  return (hash >>> 0).toString(16);
 }
 
 export interface Layout {
@@ -82,10 +75,6 @@ function Result({
   url,
 }: SectionProps<typeof loader> & { page: ProductListingPage }) {
   const filterDrawerId = useId();
-  // Termo da busca atual (para o agente de recuperação em zero results)
-  const [recoveryTerm, setRecoveryTerm] = useState<string | null>(null);
-  // Termos que o usuário fechou manualmente — não reabrir automaticamente
-  const dismissedTermsRef = useRef<Set<string>>(new Set());
 
   // Use the live URL for filter/sort/pagination link rebasing. The section
   // loader's `url` is the SSR URL — on client navigation the page re-renders
@@ -101,33 +90,17 @@ function Result({
   const zeroIndexedOffsetPage = pageInfo.currentPage - startingPage;
   const offset = zeroIndexedOffsetPage * perPage;
   const { prev, next } = rebasePaginationHrefs(pageInfo.previousPage, pageInfo.nextPage, href);
-
-  // Zero resultados → agente de recuperação entra automaticamente
   const searchTerm = new URL(href, "http://local").searchParams.get("q");
-  const isZeroResults = products.length === 0 && Boolean(searchTerm);
-  if (
-    isZeroResults &&
-    searchTerm &&
-    recoveryTerm !== searchTerm &&
-    !dismissedTermsRef.current.has(searchTerm)
-  ) {
-    setRecoveryTerm(searchTerm);
-  }
+  const isZeroResults = !isRouteLoading && products.length === 0 && Boolean(searchTerm);
 
-  // Instrumentação (Fase C): busca realizada + zero results — alimenta o dashboard.
   useEffect(() => {
     if (!searchTerm) return;
-    track({
-      event: "search_performed",
-      query_hash: hashQuery(searchTerm),
-    });
-    if (isZeroResults) {
-      track({
-        event: "search_zero_results",
-        query_hash: hashQuery(searchTerm),
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    track({ event: "search_performed", query_hash: hashQuery(searchTerm) });
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!searchTerm || !isZeroResults) return;
+    track({ event: "search_zero_results", query_hash: hashQuery(searchTerm) });
   }, [searchTerm, isZeroResults]);
 
   const viewItemListEvent = useSendEvent({
@@ -151,16 +124,13 @@ function Result({
 
   return (
     <div {...viewItemListEvent} className="w-full">
-      <div className="container flex w-full flex-col gap-5 px-3 pt-4 pb-4 sm:gap-8 sm:pt-6 sm:pb-6">
-        {recoveryTerm && (
-          <SearchRecoveryOverlay
-            term={recoveryTerm}
-            variant="inline"
-            onClose={() => {
-              dismissedTermsRef.current.add(recoveryTerm);
-              setRecoveryTerm(null);
-            }}
-          />
+      <div
+        className={`container flex w-full flex-col gap-5 px-3 pb-4 sm:gap-8 sm:pb-6 ${
+          isZeroResults ? "pt-20 sm:pt-24" : "pt-4 sm:pt-6"
+        }`}
+      >
+        {isZeroResults && searchTerm && (
+          <SearchRecoveryOverlay term={searchTerm} variant="inline" carouselLayout="wide" />
         )}
         {/* SEO: schema.org JSON-LD, server-rendered inline (crawlers read it anywhere in the document) */}
         <PLPJsonLd page={page} />
