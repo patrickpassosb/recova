@@ -2,135 +2,209 @@
 
 **A segunda chance da sua busca.**
 
-**Hackathon Agents for Commerce — Deco (2026)**
+Projeto desenvolvido para o **Hackathon Agents for Commerce - Deco (2026)**.
 
-A Recova é uma camada de IA para e-commerce que é acionada quando a busca da loja não encontra ou não entende o que o cliente procura. Ela conversa, mostra alternativas e ajuda a recuperar a venda — sem substituir a busca que você já usa.
+A Recova é uma aplicação de recuperação de busca para e-commerce, composta por um agente MCP integrado a um storefront Shopify. Quando a busca nativa retorna zero resultados, a Recova interpreta o pedido, encontra alternativas no catálogo real e permite que o cliente refine a busca, adicione um produto ao carrinho ou siga para o checkout.
+
+Ela atua sobre a busca existente: a loja não precisa substituir seu mecanismo de busca para testar a experiência.
 
 ## O problema
 
-- **10–20%** das buscas internas em e-commerce retornam zero resultados (LATAM lidera por regionalismos)
-- Quando o cliente encontra zero resultados, **a conversão cai 50–87%** e **12% dos compradores vão ao concorrente**
-- **63% dos lojistas estão insatisfeitos** com a busca nativa da plataforma
-- Usuários de busca **convertem 3–5x mais** que navegadores — é o canal de maior intenção de compra, e ele está vazando
+Buscas com termos vagos, erros de digitação ou regionalismos podem retornar zero resultados mesmo quando existem produtos relevantes no catálogo. Nesse ponto, uma jornada de alta intenção termina sem orientação, aumentando o abandono e a perda de oportunidades de venda.
 
-## O impacto em números (bottom-up)
+## O que foi criado
 
-> **Loja de alto volume:** 40 mil buscas/dia · 12% zero-results = **4.800 buscas perdidas/dia** · conversão base 3,1% · AOV R$ 120
-> = **≈ R$ 6,5 milhões/ano de receita em risco.**
->
-> A Recova recuperando **só 10%** disso = **+R$ 652 mil/ano**, a custo de **< R$ 0,05 por conversa** (≈ R$ 8.760/ano).
+O protótipo possui duas aplicações integradas:
 
-A conta inteira (buscas → zero-results → conversão × AOV → receita recuperada) está no final do README e na apresentação — o júri não discute número com a conta na mesa.
+1. **Agente MCP (`mcp-app`)** - servidor Bun com tools de recuperação, conversa, reengajamento, análise e instrumentação.
+2. **Storefront de demonstração (`demo-storefront`)** - loja React/TanStack Start conectada ao Shopify, onde a experiência da Recova aparece abaixo da busca quando não há resultados.
 
-## A solução
-
-Camada fina de IA que atua **sobre** a busca nativa (não substitui) — e funciona como um **loop agêntico fechado** (a linguagem da Deco: *observar → diagnosticar → propor → executar → medir → aprender*), não como um chatbot esperando prompt:
+O fluxo implementado é:
 
 ```text
-OBSERVAR   busca nativa retorna zero results (ou baixa relevância)
-   ↓
-DIAGNOSTICAR  understand_intent (LLM) → termos/categoria/preço + causa do vazamento
-   ↓
-PROPOR      3+ produtos REAIS do catálogo (Storefront API, grounded) em <2s + explicação
-   ├── CLIENTE COMPROU → EXECUTAR (add-to-cart) → ✅ SUCESSO (verde)
-   ├── CLIENTE RESPONDEU → 3+ produtos + explicação + nova pergunta (loop ↺)
-   └── NÃO RESPONDEU em 30s → reengajamento (máx 2) → ❌ sem conversão (vermelho)
-   ↓
-MEDIR/APRENDER  analyze_zero_results → relatório de causas + correções (T4)
+Busca nativa retorna zero resultados
+                |
+                v
+Recova consulta o catálogo Shopify e interpreta a intenção
+                |
+                v
+Produtos reais + explicação + pergunta de refinamento
+        |                    |                    |
+        v                    v                    v
+Ver produto          Refinar por texto/chip     Adicionar ao carrinho
+                                                   ou abrir checkout
+                |
+                v
+Eventos alimentam o dashboard do MVP
 ```
 
-As 4 tools MCP mapeiam exatamente esse loop: **`search_recovery`** (observar/diagnosticar/propor), **`converse`** (refinar), **`reengage`** (não desistir), **`analyze_zero_results`** (medir & aprender — o que transforma o responder em agente operador).
+### Capacidades demonstráveis
 
-### Diferenciação
+- Acionamento automático somente em buscas com zero resultados.
+- Produtos, imagens, preços e variantes vindos do catálogo Shopify da loja demo.
+- Conversa com contexto e chips de refinamento.
+- Fallback lexical quando o provedor de LLM não está configurado ou fica indisponível.
+- Reengajamento após 60 segundos de inatividade, limitado a duas mensagens automáticas.
+- Links para as páginas de produto.
+- Adição real ao carrinho Shopify e redirecionamento para o checkout.
+- Instrumentação de buscas, exposições, cliques, refinamentos, reengajamentos e checkout iniciado.
+- Dashboard calculado a partir dos eventos persistidos localmente, sem dados seed.
 
-| Player | Abordagem | Gap que exploramos |
-|---|---|---|
-| Constructor, Algolia, Bloomreach | Substituem a busca inteira (enterprise, caro) | Não atacam o zero-results da busca nativa |
-| Alhena | Busca conversacional full-page (substitui a experiência) | Não é camada de recuperação |
-| Doofinder, Klevu, Searchspring | Apps de busca (SMB/mid) | Trocar ≠ consertar |
-| VTEX IS, Shopify S&D | Busca nativa (grátis) | Não conversam, não recuperam |
-| **Recova** | **Entra SÓ quando a busca falha, com loop de reengajamento** | **Ninguém faz isso como produto** |
+> **Nota sobre atribuição:** no MVP, `purchase_attributed` é registrado depois que uma sugestão é adicionada com sucesso ao carrinho. Esse evento representa atribuição da ação à Recova, não confirmação de pagamento do pedido. O evento `checkout_started` identifica o início do checkout.
 
-## Estrutura do repo
+## Arquitetura
 
+```text
+Browser
+  |
+  v
+demo-storefront (TanStack Start + React 19)
+  |  loader server-side
+  v
+mcp-app (Bun + @decocms/runtime)
+  |                    |
+  v                    v
+Shopify Storefront API  Ollama Cloud ou API OpenAI-compatível
+catálogo/carrinho        interpretação opcional + fallback lexical
 ```
+
+O browser não chama o servidor MCP diretamente. O loader server-side do storefront encaminha as chamadas para `http://localhost:3001/api/mcp`.
+
+### Tools MCP
+
+| Tool | Função |
+|---|---|
+| `search_recovery` | Cria a sessão e encontra alternativas no catálogo |
+| `converse` | Refina a intenção mantendo o contexto da sessão |
+| `reengage` | Envia até dois lembretes automáticos |
+| `analyze_zero_results` | Agrupa causas e sugestões para buscas sem resultado |
+| `track_event` | Registra eventos da experiência |
+| `dashboard` | Agrega eventos em métricas do MVP |
+| `hello` | Tool de exemplo preservada do template MCP |
+
+## Como o júri pode testar
+
+### Opção 1: sem chave de LLM
+
+Esta é a forma mais rápida. **A `OLLAMA_API_KEY` não é obrigatória.** Sem uma chave, as tools usam o fallback lexical e o fluxo principal continua disponível: consulta ao catálogo, recomendações, refinamento, reengajamento, carrinho, checkout e instrumentação.
+
+#### Pré-requisitos
+
+- [Bun](https://bun.sh/) instalado.
+- Node.js/npm para os scripts do storefront.
+- Portas `3001` e `5173` livres.
+- Acesso à internet para consultar o catálogo Shopify da demonstração.
+
+#### 1. Inicie o agente MCP
+
+```bash
+cd mcp-app
+bun install
+bun run dev
+```
+
+O endpoint MCP ficará disponível em:
+
+```text
+http://localhost:3001/api/mcp
+```
+
+#### 2. Em outro terminal, inicie o storefront
+
+```bash
+cd demo-storefront
+bun install
+bun run dev
+```
+
+Abra `http://localhost:5173`.
+
+#### 3. Valide o fluxo
+
+1. Use a busca da loja com um pedido que não tenha correspondência direta, por exemplo: `tênis de corrida até 300`.
+2. Confirme que a página de zero resultados exibe a Recova abaixo da busca.
+3. Responda a pergunta usando um chip ou texto livre.
+4. Abra um produto ou use **Adicionar ao carrinho**.
+5. Use **Comprar** para validar o redirecionamento ao checkout Shopify.
+6. Aguarde 60 segundos sem interagir para observar o reengajamento automático.
+
+### Opção 2: experiência completa com LLM
+
+Para habilitar interpretação e perguntas geradas pelo DeepSeek V4 Flash, crie `mcp-app/.env`:
+
+```dotenv
+OLLAMA_API_KEY=sua_chave_da_ollama
+```
+
+A chave é lida somente pelo servidor MCP e não deve ser commitada nem exposta no frontend. Quem estiver apenas avaliando o fluxo não precisa criar uma conta no Ollama, pois o fallback local é automático.
+
+Também é possível usar um endpoint OpenAI-compatível:
+
+```dotenv
+OPENAI_API_KEY=sua_chave
+OPENAI_BASE_URL=https://seu-endpoint/v1
+OPENAI_MODEL=seu-modelo
+```
+
+A precedência é `OLLAMA_API_KEY` e, depois, `OPENAI_API_KEY`.
+
+## Verificação técnica
+
+```bash
+# Agente MCP
+cd mcp-app
+bun run check
+bun test
+bun run build
+
+# Storefront
+cd ../demo-storefront
+bun run typecheck
+bun test
+bun run build
+```
+
+## Persistência e limitações do MVP
+
+- As sessões de conversa ficam em memória e expiram após 30 minutos.
+- Os eventos do dashboard são persistidos em `mcp-app/data/events.json`.
+- A integração atual aponta para a loja Shopify de demonstração `gimenesdevstore`.
+- O gatilho implementado é zero-results; baixa relevância ainda não aciona a experiência no storefront.
+- O dashboard mede eventos do funil, mas não recebe confirmação de pedido pago por webhook Shopify.
+- O servidor MCP local usa a porta `3001`; o loader do storefront atualmente aponta para esse endereço.
+
+## Estrutura do repositório
+
+```text
 recova/
-├── mcp-app/             # O AGENTE — tools MCP (search_recovery, converse, reengage, analyze_zero_results)
-├── demo-storefront/     # O AMBIENTE DE DEMO — overlay conversacional na busca
-└── docs/
-    ├── PRD.md           # Product Requirements Document (v2)
-    ├── FLUXOGRAMA.md    # Jornada do usuário (fluxograma)
-    └── search-recovery-fluxograma.excalidraw  # Fluxograma editável
+|-- mcp-app/             # agente e servidor MCP + UIs das tools
+|-- demo-storefront/     # storefront Shopify e experiência integrada
+`-- docs/
+    |-- PRD.md
+    |-- FLUXOGRAMA.md
+    `-- search-recovery-fluxograma.excalidraw
 ```
 
 ## Stack
 
-- **mcp-app**: Bun + @decocms/runtime (MCP server) + React 19 + shadcn/ui — tools com UI
-- **demo-storefront**: TanStack Start + React 19 + Cloudflare Workers + Shopify Storefront API (loja demo `gimenesdevstore`)
-- **LLM**: DeepSeek V4 Flash (API oficial do Ollama Cloud, `ollama.com/v1`) — custo < R$0.05/conversa
-
-## Como rodar
-
-```bash
-# MCP App (o agente)
-cd mcp-app
-bun install
-bun run dev          # servidor MCP em http://localhost:3001/api/mcp
-
-# Demo storefront (o ambiente)
-cd demo-storefront
-bun install
-bun run dev          # storefront com overlay conversacional
-```
-
-## Métricas do MVP
-
-| Métrica | Baseline | Alvo |
-|---|---|---|
-| Time-to-alternatives | N/A | <2s |
-| Conversational conversion | 3.1% (sem IA) | 12%+ |
-| Zero-results recovery | 0% | 30%+ |
-| Recovery após timeout 30s | 0% | 5%+ |
-| Custo por conversa | N/A | <R$0.05 |
+- **Agente MCP:** Bun, TypeScript, `@decocms/runtime`, Zod e MCP Apps.
+- **UI das tools:** React 19, Vite, Tailwind CSS e shadcn/ui.
+- **Storefront:** TanStack Start, React 19, Deco e Cloudflare Workers.
+- **Commerce:** Shopify Storefront API.
+- **LLM opcional:** DeepSeek V4 Flash via Ollama Cloud ou endpoint OpenAI-compatível.
+- **Testes:** Bun Test e Testing Library.
 
 ## Branding
 
-- **Nome:** Recova (marca proprietária, sem tradução)
-- **Tagline:** "A segunda chance da sua busca"
-- **Cores:** Azul Recova `#155EEF`, Azul Profundo `#102A43`, Laranja Resgate `#F97316`, Verde `#16A34A`
-- **Tipografia:** Manrope (display) + Inter (corpo)
-- **Brand book completo:** `docs/brand_book.md` (no vault do time)
+- **Nome:** Recova.
+- **Tagline:** "A segunda chance da sua busca".
+- **Cores:** Azul Recova `#155EEF`, Azul Profundo `#102A43`, Laranja Resgate `#F97316` e Verde `#16A34A`.
+- **Tipografia:** Manrope para display e Inter para corpo.
 
-## Ferramentas usadas
+## Status
 
-- Claude Code / agentes de IA (ferramenta livre conforme regras do evento)
-- Deco Studio (créditos) + MCP App + demo-storefront
-- DeepSeek V4 Flash
-- Bun, TanStack Start, React 19, Tailwind v4
+Este repositório é um protótipo funcional de hackathon. Metas de conversão, custos por conversa, projeções de receita e comparações de mercado ainda precisam de validação em operação real e, por isso, não são apresentadas como resultados comprovados.
 
 ---
 
-## A conta da receita recuperada (bottom-up)
-
-Premissas de uma loja de alto volume. Cada linha tem fonte real (org + URL + ano) ou está marcada como **premissa interna** com justificativa.
-
-| Linha | Valor | Fonte |
-|---|---|---|
-| Buscas internas/dia | 40.000 | **Premissa interna** — loja de alto volume (referência: Doofinder processa 175M buscas/mês em 10.000+ lojas ≈ 583 buscas/dia/loja média; 40k/dia é uma loja grande, não a média) |
-| Taxa de zero-results | 12% | SearchMind/Barilliance (citado via Doofinder/Algolia) + Bloomreach 12–20% — https://www.bloomreach.com/en/blog/how-to-fix-zero-search-results-in-ecommerce (2026) |
-| Buscas perdidas/dia | 4.800 | 40.000 × 12% (cálculo) |
-| Conversão base (busca) | 3,1% | Rep AI 2025, citado via Alhena — https://alhena.ai/blog/alhena-ai-vs-dynamic-yield/ (2025-2026): shoppers que engajam com IA convertem 12,3% vs 3,1% |
-| AOV | R$ 120 | **Premissa interna conservadora** — SMB brasileiro. Dado real de mercado: ABComm 2026 ticket médio R$ 564,96 (https://edrone.me/br/blog/dados-ecommerce-brasil) e Nuvemshop R$ 539 (https://www.nuvemshop.com.br/blog/dados-ecommerce/). Usamos R$ 120 como premissa SMB conservadora (loja menor que a média nacional) |
-| Receita em risco/ano | **≈ R$ 6,5 M** | 4.800 × 3,1% × R$ 120 × 365 |
-| Taxa de recuperação da Recova | 10% | conservador; target do MVP 30%+ |
-| **Receita recuperada/ano** | **≈ R$ 652 mil** | 6,5 M × 10% |
-| Custo por conversa | **< R$ 0,05** | DeepSeek V4 Flash, cache, max_tokens baixo |
-| Custo anual ≈ | R$ 8.760 | 4.800 × 365 × 10% × R$ 0,05 |
-
-> **Nota de fontes:** os números de volume de busca (40k/dia) e AOV (R$ 120) são **premissas internas** — não há fonte pública rastreável para uma loja específica de alto volume. O ticket médio real do e-commerce brasileiro (ABComm R$ 564,96 / Nuvemshop R$ 539) é maior; usamos R$ 120 como premissa SMB conservadora para não inflar a conta. A taxa de zero-results (12%) e a conversão base (3,1%) têm fonte citável.
-
-Mesmo recuperando **1 em cada 10** buscas perdidas e com custo de centavos por conversa, o ROI é de **centenas de milhares de reais/ano** — sem trocar a busca, sem dev, sem custo de adoção.
-
----
-
-Projeto desenvolvido durante o Hackathon Agents for Commerce (Deco), 01–09/08/2026.
+Projeto desenvolvido durante o Hackathon Agents for Commerce - Deco, de 1 a 9 de agosto de 2026.
