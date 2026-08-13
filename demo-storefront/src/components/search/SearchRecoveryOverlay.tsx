@@ -348,6 +348,13 @@ function ProductCarousel({
             </article>
           );
         })}
+        {/* Espaçador à direita: largura de meia card para que o último card
+            role completamente para fora do corte do container (snap final). */}
+        <div
+          className="shrink-0"
+          aria-hidden="true"
+          style={{ width: Math.round(cardWidth / 2) }}
+        />
       </div>
       {products.length > 1 && (
         <div className="flex items-center justify-center gap-1.5 pt-1" aria-label="Indicador de paginação">
