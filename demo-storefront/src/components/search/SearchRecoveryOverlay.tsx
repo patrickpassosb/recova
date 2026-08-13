@@ -344,12 +344,12 @@ function ProductCarousel({
                 )}
               </div>
               {isActive && (
-                <div className="mt-auto flex flex-col gap-1.5">
+                <div className="mt-auto flex gap-1.5">
                   <button
                     type="button"
                     onClick={() => onAddToCart(p, true)}
                     disabled={isAddingToCart}
-                    className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                    className="flex-1 rounded-md px-2 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
                     style={{ backgroundColor: theme.colors.primary }}
                   >
                     {theme.copy.buy}
@@ -358,7 +358,7 @@ function ProductCarousel({
                     type="button"
                     onClick={() => onAddToCart(p, false)}
                     disabled={isAddingToCart}
-                    className="rounded-md border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                    className="flex-1 rounded-md border px-2 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
                     style={{
                       borderColor: theme.colors.primary,
                       color: theme.colors.primary,
@@ -759,11 +759,11 @@ export default function SearchRecoveryOverlay({
             : {}),
       }}
     >
-      {/* Header — identidade Recova limpa: apenas o logo wordmark. */}
+      {/* Header — identidade Recova limpa: navy sempre (verde reservado ao status no corpo). */}
       <div
         className="flex items-center justify-between px-4 py-3"
         style={{
-          backgroundColor: isSuccess ? theme.colors.success : theme.colors.headerBg,
+          backgroundColor: theme.colors.headerBg,
           color: theme.colors.headerText,
         }}
       >

@@ -92,88 +92,113 @@ export default function DashboardPage() {
 
 	const { totals, metrics } = result;
 
+	// Nomes legíveis dos eventos (PT-BR) para a tabela.
+	const EVENT_LABELS: Record<string, string> = {
+	  search_performed: "Busca realizada",
+	  search_zero_results: "Busca sem resultado",
+	  search_low_relevance: "Baixa relevância",
+	  recova_exposed: "Recova exibida",
+	  recova_product_viewed: "Produto visto",
+	  recova_product_clicked: "Produto clicado",
+	  recova_refinement_started: "Refinamento iniciado",
+	  recova_reengaged: "Reengajamento",
+	  recova_closed: "Overlay fechado",
+	  purchase_attributed: "Compra atribuída",
+	  checkout_started: "Checkout iniciado",
+	};
+
 	return (
-		<div className="min-h-dvh p-6">
-			<div className="mx-auto max-w-4xl space-y-4">
-				<Card className="border-0 shadow-md">
-					<CardHeader className="bg-[#102A43] text-white rounded-t-xl flex flex-row items-center gap-3">
-						<img
-							src={RECOVA_LOGO}
-							alt="Recova"
-							className="h-8 w-auto"
-						/>
-						<div>
-							<CardTitle className="text-lg text-white font-display">
-								Dashboard Recova
-							</CardTitle>
-							<p className="text-sm text-slate-300">
-								Métricas reais de recuperação de vendas — sem seed, sem badge.
-							</p>
-						</div>
-					</CardHeader>
-				</Card>
+	  <div className="min-h-dvh p-6">
+	    <div className="mx-auto max-w-4xl space-y-5">
+	      <Card className="border-0 shadow-md">
+	        <CardHeader className="bg-[#102A43] text-white rounded-t-xl flex flex-row items-center gap-3">
+	          <img
+	            src={RECOVA_LOGO}
+	            alt="Recova"
+	            className="h-8 w-auto"
+	          />
+	          <div>
+	            <CardTitle className="text-lg text-white font-display">
+	              Dashboard Recova
+	            </CardTitle>
+	            <p className="text-sm text-slate-300">
+	              Métricas reais de recuperação de vendas — sem seed, sem badge.
+	            </p>
+	          </div>
+	        </CardHeader>
+	      </Card>
 
-				<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-					<MetricCard label="Buscas" value={totals.searches} />
-					<MetricCard label="Zero resultados" value={totals.zero_results} accent="orange" />
-					<MetricCard label="Exposições" value={totals.exposed} />
-					<MetricCard label="Compras atribuídas" value={totals.purchases} accent="green" />
-				</div>
+	      <div>
+	        <h2 className="mb-2 text-sm font-semibold text-[#102A43] font-display">
+	          Visão geral
+	        </h2>
+	        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+	          <MetricCard label="Buscas" value={totals.searches} />
+	          <MetricCard label="Zero resultados" value={totals.zero_results} accent="orange" />
+	          <MetricCard label="Exposições" value={totals.exposed} />
+	          <MetricCard label="Compras atribuídas" value={totals.purchases} accent="green" />
+	        </div>
+	      </div>
 
-				<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-					<MetricCard label="Taxa zero-results" value={metrics.zero_results_rate} suffix="%" accent="orange" />
-					<MetricCard label="Taxa de recuperação" value={metrics.recovery_rate} suffix="%" accent="green" />
-					<MetricCard label="Receita atribuída" value={`R$ ${metrics.attributed_revenue.toLocaleString("pt-BR")}`} accent="blue" />
-					<MetricCard label="Receita / busca falha" value={`R$ ${metrics.revenue_per_failed_search.toLocaleString("pt-BR")}`} accent="blue" />
-					<MetricCard label="CTR alternativas" value={metrics.click_through_rate} suffix="%" />
-					<MetricCard label="Taxa de refinamento" value={metrics.refinement_rate} suffix="%" />
-					<MetricCard label="Produtos / usuário" value={metrics.products_per_user} />
-					<MetricCard label="Checkout iniciado" value={metrics.checkout_rate} suffix="%" accent="green" />
-				</div>
+	      <div>
+	        <h2 className="mb-2 text-sm font-semibold text-[#102A43] font-display">
+	          Desempenho
+	        </h2>
+	        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+	          <MetricCard label="Taxa de zero resultados" value={metrics.zero_results_rate} suffix="%" accent="orange" />
+	          <MetricCard label="Taxa de recuperação" value={metrics.recovery_rate} suffix="%" accent="green" />
+	          <MetricCard label="Receita atribuída" value={`R$ ${metrics.attributed_revenue.toLocaleString("pt-BR")}`} accent="blue" />
+	          <MetricCard label="Receita por busca falha" value={`R$ ${metrics.revenue_per_failed_search.toLocaleString("pt-BR")}`} accent="blue" />
+	          <MetricCard label="CTR das alternativas" value={metrics.click_through_rate} suffix="%" />
+	          <MetricCard label="Taxa de refinamento" value={metrics.refinement_rate} suffix="%" />
+	          <MetricCard label="Produtos por usuário" value={metrics.products_per_user} />
+	          <MetricCard label="Checkout iniciado" value={metrics.checkout_rate} suffix="%" accent="green" />
+	        </div>
+	      </div>
 
-				<Card>
-					<CardHeader>
-						<CardTitle className="text-base">Eventos recentes</CardTitle>
-					</CardHeader>
-					<CardContent>
-						{result.recent.length === 0 ? (
-							<p className="text-sm text-muted-foreground">
-								Nenhum evento ainda. Faça uma busca com zero resultados para gerar dados reais.
-							</p>
-						) : (
-							<div className="overflow-x-auto rounded-lg border">
-								<table className="w-full text-sm">
-									<thead>
-										<tr className="border-b bg-muted/50 text-left">
-											<th className="p-2 font-medium">Evento</th>
-											<th className="p-2 font-medium">Timestamp</th>
-											<th className="p-2 font-medium">Sessão</th>
-										</tr>
-									</thead>
-									<tbody>
-										{result.recent.map((e, i) => {
-											const ts = new Date(String(e.timestamp));
-											const ago = Math.max(0, Math.round((Date.now() - ts.getTime()) / 1000));
-											const when = ago < 60 ? `${ago}s atrás` : ago < 3600 ? `${Math.round(ago / 60)}min atrás` : ts.toLocaleString("pt-BR");
-											return (
-												<tr key={i} className="border-b last:border-0">
-													<td className="p-2">
-														<Badge variant="secondary">{String(e.event)}</Badge>
-													</td>
-													<td className="p-2 text-muted-foreground">{when}</td>
-													<td className="p-2 text-muted-foreground">
-														{String(e.session_id ?? "-").slice(0, 8)}
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</div>
-						)}
-					</CardContent>
-				</Card>
-			</div>
-		</div>
+	      <Card>
+	        <CardHeader>
+	          <CardTitle className="text-base font-display">Eventos recentes</CardTitle>
+	        </CardHeader>
+	        <CardContent>
+	          {result.recent.length === 0 ? (
+	            <p className="text-sm text-muted-foreground">
+	              Nenhum evento ainda. Faça uma busca com zero resultados para gerar dados reais.
+	            </p>
+	          ) : (
+	            <div className="overflow-x-auto rounded-lg border">
+	              <table className="w-full text-sm">
+	                <thead>
+	                  <tr className="border-b bg-muted/50 text-left">
+	                    <th className="p-2 font-medium">Evento</th>
+	                    <th className="p-2 font-medium">Quando</th>
+	                    <th className="p-2 font-medium">Sessão</th>
+	                  </tr>
+	                </thead>
+	                <tbody>
+	                  {result.recent.map((e, i) => {
+	                    const ts = new Date(String(e.timestamp));
+	                    const ago = Math.max(0, Math.round((Date.now() - ts.getTime()) / 1000));
+	                    const when = ago < 60 ? `${ago}s atrás` : ago < 3600 ? `${Math.round(ago / 60)}min atrás` : ts.toLocaleString("pt-BR");
+	                    return (
+	                      <tr key={i} className="border-b last:border-0">
+	                        <td className="p-2">
+	                          <Badge variant="secondary">{EVENT_LABELS[String(e.event)] ?? String(e.event)}</Badge>
+	                        </td>
+	                        <td className="p-2 text-muted-foreground">{when}</td>
+	                        <td className="p-2 text-muted-foreground">
+	                          {String(e.session_id ?? "-").slice(0, 8)}
+	                        </td>
+	                      </tr>
+	                    );
+	                  })}
+	                </tbody>
+	              </table>
+	            </div>
+	          )}
+	        </CardContent>
+	      </Card>
+	    </div>
+	  </div>
 	);
-}
+	}
