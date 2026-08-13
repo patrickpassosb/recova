@@ -141,7 +141,7 @@ function Result({
 
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-[220px_1fr]">
           <aside className="hidden flex-col gap-6 place-self-start sm:flex">
-            <span className="text-sm font-medium text-ink-soft">Filters</span>
+            <span className="text-sm font-medium text-ink-soft">Filtros</span>
             <Filters filters={filters} baseUrl={href} />
           </aside>
 

@@ -19,7 +19,9 @@ export default function SearchSortBar({
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-xs text-muted">
-        {recordPerPage} of {totalRecords} results
+        {totalRecords === 0
+          ? "0 resultados"
+          : `${recordPerPage} de ${totalRecords} ${totalRecords === 1 ? "resultado" : "resultados"}`}
       </span>
 
       <div className="flex items-center gap-2">
@@ -30,7 +32,7 @@ export default function SearchSortBar({
             htmlFor={filterDrawerId}
             className="tap-scale frost flex h-9 items-center gap-1.5 rounded-sm px-3 text-xs text-ink-soft sm:hidden"
           >
-            Filters
+            Filtros
           </label>
         )}
       </div>

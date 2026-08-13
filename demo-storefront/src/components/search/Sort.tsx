@@ -34,14 +34,14 @@ const getNavTarget = (href: string, value: string) => {
 };
 
 const labels: Record<string, string> = {
-  "relevance:desc": "Relevance",
-  "price:desc": "Highest price",
-  "price:asc": "Lowest price",
-  "orders:desc": "Best sellers",
-  "name:desc": "Name — Z to A",
-  "name:asc": "Name — A to Z",
-  "release:desc": "Newest",
-  "discount:desc": "Biggest discount",
+  "relevance:desc": "Relevância",
+  "price:desc": "Maior preço",
+  "price:asc": "Menor preço",
+  "orders:desc": "Mais vendidos",
+  "name:desc": "Nome — Z a A",
+  "name:asc": "Nome — A a Z",
+  "release:desc": "Mais recentes",
+  "discount:desc": "Maior desconto",
 };
 
 export default function Sort({ sortOptions, url }: Props) {
@@ -65,7 +65,7 @@ export default function Sort({ sortOptions, url }: Props) {
   return (
     <>
       <label htmlFor="sort" className="sr-only">
-        Sort by
+        Ordenar por
       </label>
       <select
         id="sort"
