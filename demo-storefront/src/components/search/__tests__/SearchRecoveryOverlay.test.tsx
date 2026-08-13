@@ -195,19 +195,21 @@ describe("SearchRecoveryOverlay", () => {
     expect(document.querySelector("[data-card]")).toBeTruthy();
   });
 
-  it("uses the requested masked and wide Coverflow layouts", async () => {
+  it("uses the requested masked and wide scroll-snap carousel layouts", async () => {
     const masked = renderOverlay({ variant: "inline", carouselLayout: "masked" });
     await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
     const maskedCarousel = screen.getByRole("region", { name: "Produtos recomendados" });
     expect(maskedCarousel.getAttribute("data-carousel-layout")).toBe("masked");
-    expect(maskedCarousel.querySelector("[data-card]")?.className).toContain("h-[22rem] w-60");
+    expect(maskedCarousel.querySelector("[data-card]")?.className).toContain("snap-center");
+    expect(maskedCarousel.querySelector("[data-card]")?.className).toContain("h-[22.5rem]");
 
     masked.unmount();
     renderOverlay({ variant: "inline", carouselLayout: "wide" });
     await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
     const wideCarousel = screen.getByRole("region", { name: "Produtos recomendados" });
     expect(wideCarousel.getAttribute("data-carousel-layout")).toBe("wide");
-    expect(wideCarousel.querySelector("[data-card]")?.className).toContain("h-[27.5rem] w-80");
+    expect(wideCarousel.querySelector("[data-card]")?.className).toContain("snap-center");
+    expect(wideCarousel.querySelector("[data-card]")?.className).toContain("h-[27.5rem]");
   });
 
   it("shows Shopify product descriptions in compact and wide layouts", async () => {
@@ -295,7 +297,7 @@ describe("SearchRecoveryOverlay", () => {
     expect(chat.scrollTop).toBe(900);
   });
 
-  it("selects a visible side card when clicked", async () => {
+  it("renders action buttons on every product card (not only the active one)", async () => {
     globalThis.fetch = (async (input: any) => {
       if (!String(input).includes("/deco/invoke/")) {
         throw new Error(`Unexpected fetch in component test: ${input}`);
@@ -314,10 +316,13 @@ describe("SearchRecoveryOverlay", () => {
     }) as typeof fetch;
 
     renderOverlay({ variant: "inline", carouselLayout: "wide" });
-    await waitFor(() => expect(screen.getByLabelText("Selecionar Canvas Slip-On")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Selecionar Canvas Slip-On"));
-    expect(screen.queryByLabelText("Selecionar Canvas Slip-On")).toBeNull();
-    expect(screen.getByLabelText("Selecionar High Top Canvas Shoes")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Canvas Slip-On")).toBeTruthy());
+    const cards = document.querySelectorAll("[data-card]");
+    expect(cards.length).toBeGreaterThanOrEqual(2);
+    for (const card of cards) {
+      const buttons = card.querySelectorAll("button");
+      expect(buttons.length).toBeGreaterThanOrEqual(2);
+    }
   });
 
   it("links the footer Recova logo to the landing page", async () => {

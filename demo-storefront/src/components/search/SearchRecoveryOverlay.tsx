@@ -135,7 +135,11 @@ function hashQuery(query: string): string {
   return (h >>> 0).toString(16);
 }
 
-/** Coverflow adaptado do padrão visual do OriginKit para cards de produto. */
+/**
+ * Carrossel de produtos horizontal com scroll-snap (brand book Recova).
+ * Cada card é totalmente interativo: imagem, título, descrição e os 2 botões
+ * (Comprar / Adicionar ao carrinho). Sem cards "fantasma" sobrepostos.
+ */
 function ProductCarousel({
   products,
   theme,
@@ -153,57 +157,36 @@ function ProductCarousel({
   autoPlay: boolean;
   layout: "masked" | "wide";
 }) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [rotationPaused, setRotationPaused] = useState(false);
-  const [stageWidth, setStageWidth] = useState(0);
-  const stageRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
-  const touchStartRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [products]);
+  const cardWidth = layout === "masked" ? 240 : 320;
+  const cardHeight = layout === "masked" ? "h-[22.5rem]" : "h-[27.5rem]";
 
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const updateWidth = () => setStageWidth(stage.clientWidth);
-    updateWidth();
-    if (typeof window.ResizeObserver !== "function") return;
-    const observer = new window.ResizeObserver(updateWidth);
-    observer.observe(stage);
-    return () => observer.disconnect();
-  }, []);
-
+  // Autoplay: avança o scroll suavemente a cada 3s (pausa em hover/foco/toque).
   useEffect(() => {
     if (!autoPlay || products.length <= 1 || rotationPaused) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (reducedMotion.matches) return;
     const id = setInterval(() => {
-      if (pausedRef.current || document.hidden) return;
-      setActiveIndex((index) => (index + 1) % products.length);
+      const track = trackRef.current;
+      if (!track || pausedRef.current || document.hidden) return;
+      const next = track.scrollLeft + cardWidth;
+      if (next >= track.scrollWidth - track.clientWidth - 4) {
+        track.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        track.scrollTo({ left: next, behavior: "smooth" });
+      }
     }, 3000);
     return () => clearInterval(id);
-  }, [autoPlay, products.length, rotationPaused]);
+  }, [autoPlay, products.length, rotationPaused, cardWidth]);
 
   const move = (direction: -1 | 1) => {
-    setActiveIndex((index) => (index + direction + products.length) % products.length);
+    const track = trackRef.current;
+    if (!track) return;
+    track.scrollBy({ left: direction * cardWidth, behavior: "smooth" });
   };
-
-  const relativeOffset = (index: number) => {
-    let offset = index - activeIndex;
-    if (offset > products.length / 2) offset -= products.length;
-    if (offset < -products.length / 2) offset += products.length;
-    return offset;
-  };
-
-  const cardWidth = layout === "masked" ? 240 : 320;
-  const visibleSideCount = Math.min(2, Math.floor((products.length - 1) / 2));
-  const wideSpacing =
-    stageWidth > 0 && visibleSideCount > 0
-      ? Math.max(cardWidth * 0.72, (stageWidth - cardWidth - 32) / (visibleSideCount * 2))
-      : cardWidth * 0.9;
-  const cardSpacing = layout === "masked" ? cardWidth * 0.72 : wideSpacing;
 
   return (
     <div
@@ -211,7 +194,7 @@ function ProductCarousel({
       aria-roledescription="carousel"
       aria-label="Produtos recomendados"
       data-carousel-layout={layout}
-      className="relative w-full overflow-hidden rounded-lg py-2"
+      className="relative w-full py-2"
       onMouseEnter={() => {
         pausedRef.current = true;
       }}
@@ -226,32 +209,20 @@ function ProductCarousel({
           pausedRef.current = false;
         }
       }}
-      onTouchStart={(event) => {
+      onTouchStart={() => {
         pausedRef.current = true;
-        touchStartRef.current = event.touches[0]?.clientX ?? null;
       }}
-      onTouchEnd={(event) => {
-        const start = touchStartRef.current;
-        const end = event.changedTouches[0]?.clientX;
-        if (start != null && end != null && Math.abs(start - end) > 35) {
-          move(start > end ? 1 : -1);
-        }
-        touchStartRef.current = null;
+      onTouchEnd={() => {
         pausedRef.current = false;
       }}
     >
       <div
-        ref={stageRef}
-        className={`relative mx-auto w-full [perspective:1100px] ${
-          layout === "masked" ? "h-[24rem]" : "h-[29.5rem]"
-        }`}
+        ref={trackRef}
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1"
+        style={{ scrollPaddingInline: "max(1rem, calc((100% - 42rem) / 2))" }}
       >
-        {products.map((p) => {
+        {products.map((p, index) => {
           const url = productUrl(p.handle);
-          const index = products.indexOf(p);
-          const offset = relativeOffset(index);
-          const isActive = offset === 0;
-          const isVisible = Math.abs(offset) <= 2;
           return (
             <article
               key={p.id}
@@ -259,32 +230,20 @@ function ProductCarousel({
               role="group"
               aria-roledescription="slide"
               aria-label={`Produto ${index + 1} de ${products.length}`}
-              aria-hidden={!isVisible}
-              className={`absolute left-1/2 top-1/2 flex flex-col gap-2 overflow-hidden rounded-lg border p-2 shadow-md motion-safe:transition-[transform,opacity] motion-safe:duration-300 motion-safe:ease-in-out ${
-                layout === "masked" ? "h-[22rem] w-60" : "h-[27.5rem] w-80"
-              }`}
+              className={`${cardHeight} flex shrink-0 snap-center flex-col gap-2 overflow-hidden rounded-lg border p-3 shadow-sm transition-shadow hover:shadow-md`}
               style={{
                 backgroundColor: theme.colors.cardBg,
                 borderColor: theme.colors.border,
-                opacity: isVisible ? (isActive ? 1 : 0.58) : 0,
-                pointerEvents: isVisible ? "auto" : "none",
-                transform: `translate(-50%, -50%) translateX(${offset * cardSpacing}px) translateZ(${isActive ? 0 : -140}px) rotateY(${offset * -14}deg) scale(${isActive ? 1 : 0.86})`,
-                zIndex: 10 - Math.abs(offset),
+                width: cardWidth,
               }}
             >
-              {!isActive && isVisible && (
-                <button
-                  type="button"
-                  aria-label={`Selecionar ${p.title}`}
-                  onClick={() => {
-                    pausedRef.current = true;
-                    setActiveIndex(index);
-                  }}
-                  className="absolute inset-0 z-20 cursor-pointer rounded-lg bg-transparent focus-visible:ring-2"
-                />
-              )}
-              {url && isActive ? (
-                <a href={url} aria-label={`Ver ${p.title}`} onClick={() => onProductClick(p)}>
+              {url ? (
+                <a
+                  href={url}
+                  aria-label={`Ver ${p.title}`}
+                  onClick={() => onProductClick(p)}
+                  className="block focus-visible:ring-2"
+                >
                   {p.image ? (
                     <img
                       src={p.image}
@@ -303,7 +262,7 @@ function ProductCarousel({
               ) : p.image ? (
                 <img
                   src={p.image}
-                  alt={isActive ? p.title : ""}
+                  alt={p.title}
                   className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md object-contain`}
                   loading="lazy"
                   decoding="async"
@@ -315,7 +274,7 @@ function ProductCarousel({
                 />
               )}
               <div className="min-h-0 min-w-0 flex-1">
-                {url && isActive ? (
+                {url ? (
                   <a
                     href={url}
                     className="line-clamp-2 block text-sm font-medium leading-snug hover:underline focus-visible:ring-2"
@@ -347,38 +306,36 @@ function ProductCarousel({
                   </p>
                 )}
               </div>
-              {isActive && (
-                <div className="mt-auto flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => onAddToCart(p, true)}
-                    disabled={isAddingToCart}
-                    className="flex-1 rounded-md px-2 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
-                    style={{ backgroundColor: theme.colors.primary }}
-                  >
-                    {theme.copy.buy}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAddToCart(p, false)}
-                    disabled={isAddingToCart}
-                    className="flex-1 rounded-md border px-2 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
-                    style={{
-                      borderColor: theme.colors.primary,
-                      color: theme.colors.primary,
-                      backgroundColor: "transparent",
-                    }}
-                  >
-                    {theme.copy.addToCart}
-                  </button>
-                </div>
-              )}
+              <div className="mt-auto flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onAddToCart(p, true)}
+                  disabled={isAddingToCart}
+                  className="flex-1 rounded-md px-2 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                  style={{ backgroundColor: theme.colors.primary }}
+                >
+                  {theme.copy.buy}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddToCart(p, false)}
+                  disabled={isAddingToCart}
+                  className="flex-1 rounded-md border px-2 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                  style={{
+                    borderColor: theme.colors.primary,
+                    color: theme.colors.primary,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  {theme.copy.addToCart}
+                </button>
+              </div>
             </article>
           );
         })}
       </div>
       {products.length > 1 && (
-        <div className="flex items-center justify-center gap-2" aria-label="Controles do carrossel">
+        <div className="flex items-center justify-center gap-2 pt-1" aria-label="Controles do carrossel">
           <button
             type="button"
             onClick={() => move(-1)}
@@ -782,12 +739,20 @@ export default function SearchRecoveryOverlay({
           color: theme.colors.headerText,
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <img
             src={theme.logo ?? recovaLogoLight}
             alt={theme.brandName}
             className="h-6 w-auto object-contain"
           />
+          {theme.tagline && (
+            <span
+              className="hidden text-xs font-medium text-white/70 sm:inline"
+              style={{ fontFamily: theme.fonts.body }}
+            >
+              {theme.tagline}
+            </span>
+          )}
         </div>
         {variant === "popup" && (
           <button
@@ -825,7 +790,7 @@ export default function SearchRecoveryOverlay({
               color: theme.colors.text,
             }}
           >
-            <p className="font-semibold" style={{ color: theme.colors.primary }}>
+            <p className="font-semibold" style={{ color: theme.colors.accent }}>
               Não encontramos exatamente "{term}"
             </p>
             <p className="mt-1" style={{ color: theme.colors.muted }}>
@@ -864,6 +829,39 @@ export default function SearchRecoveryOverlay({
 
             {msg.role === "agent" && msg.products && msg.products.length > 0 && (
               <div className="flex w-full flex-col gap-2">
+                {/* Chips de refinamento (acima do carrossel) quando a mensagem
+                    traz opções — decisão do loop visual. */}
+                {msg.refinementOptions && msg.refinementOptions.length > 0 && (
+                  <div
+                    className="flex flex-col gap-2 rounded-lg border p-3"
+                    style={{
+                      backgroundColor: theme.colors.cardBg,
+                      borderColor: theme.colors.border,
+                    }}
+                  >
+                    <p className="text-sm font-bold" style={{ color: theme.colors.text }}>
+                      O que você prefere?
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {msg.refinementOptions.map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => handleSend(chip)}
+                          disabled={thinking}
+                          className="rounded-full border px-3.5 py-2 text-xs font-semibold transition-all hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                          style={{
+                            borderColor: theme.colors.primary,
+                            color: theme.colors.primary,
+                            backgroundColor: "transparent",
+                          }}
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {/* Carrossel horizontal de produtos (decisão 09/08): arrastável,
                     com scroll-snap e auto-play (passa sozinho por padrão, pausa
                     quando o usuário interage). Não é lista vertical comprida. */}
@@ -890,42 +888,8 @@ export default function SearchRecoveryOverlay({
           </div>
         ))}
 
-        {/* Mantém os últimos chips acionáveis durante mensagens de reengajamento. */}
-        {(() => {
-          const chips = getLatestRefinementOptions(messages);
-          if (!chips || chips.length === 0 || isSuccess) return null;
-          return (
-            <div
-              className="flex flex-col gap-2 rounded-lg border p-3"
-              style={{
-                backgroundColor: theme.colors.cardBg,
-                borderColor: theme.colors.border,
-              }}
-            >
-              <p className="text-sm font-bold" style={{ color: theme.colors.text }}>
-                O que você prefere?
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {chips.map((chip) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    onClick={() => handleSend(chip)}
-                    disabled={thinking}
-                    className="rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-40"
-                    style={{
-                      borderColor: theme.colors.primary,
-                      color: theme.colors.primary,
-                      backgroundColor: "transparent",
-                    }}
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
+        {/* Os chips de refinamento são renderizados acima de cada carrossel,
+            junto da mensagem que os traz (decisão do loop visual). */}
 
         {thinking && (
           <div className="flex items-center gap-2 text-sm" style={{ color: theme.colors.muted }}>
