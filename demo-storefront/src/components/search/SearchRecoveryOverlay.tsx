@@ -811,10 +811,10 @@ export default function SearchRecoveryOverlay({
             }}
           >
             <p className="font-semibold" style={{ color: theme.colors.primary }}>
-              Nenhum resultado exato para "{term}"
+              Não encontramos exatamente "{term}"
             </p>
             <p className="mt-1" style={{ color: theme.colors.muted }}>
-              Mas encontrei alternativas que podem servir. Veja abaixo e refine com os chips.
+              Mas separamos algumas opções que podem atender ao que você procura. Veja abaixo e refine com os chips.
             </p>
           </div>
         )}
@@ -921,13 +921,19 @@ export default function SearchRecoveryOverlay({
 
         {isSuccess && (
           <div
-            className="rounded-lg p-3 text-sm"
+            className="flex items-center gap-2 rounded-lg p-3 text-sm"
             style={{
               backgroundColor: `${theme.colors.success}1A`,
               color: theme.colors.success,
             }}
           >
-            Obrigado! Sua compra foi registrada.
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke={theme.colors.success} strokeWidth="2" />
+              <path d="M8 12.5l2.5 2.5L16 9.5" stroke={theme.colors.success} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>
+              {theme.copy.buySuccessTitle} {theme.copy.buySuccessSubtitle.toLowerCase()}.
+            </span>
           </div>
         )}
       </div>
