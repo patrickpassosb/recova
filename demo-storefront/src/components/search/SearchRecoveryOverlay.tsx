@@ -159,10 +159,23 @@ function ProductCarousel({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [rotationPaused, setRotationPaused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const pausedRef = useRef(false);
 
   const cardWidth = layout === "masked" ? 240 : 320;
   const cardHeight = layout === "masked" ? "h-[17rem]" : "h-[19rem]";
+
+  // Atualiza o índice ativo conforme o scroll do track (indicador de paginação).
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || products.length <= 1) return;
+    const onScroll = () => {
+      const idx = Math.round(track.scrollLeft / (cardWidth + 12));
+      setActiveIndex(Math.min(products.length - 1, Math.max(0, idx)));
+    };
+    track.addEventListener("scroll", onScroll, { passive: true });
+    return () => track.removeEventListener("scroll", onScroll);
+  }, [products.length, cardWidth]);
 
   // Autoplay: avança o scroll suavemente a cada 3s (pausa em hover/foco/toque).
   useEffect(() => {
@@ -218,7 +231,7 @@ function ProductCarousel({
     >
       <div
         ref={trackRef}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth py-2"
         style={{ scrollPaddingInline: "max(1rem, calc((100% - 42rem) / 2))" }}
       >
         {products.map((p, index) => {
@@ -244,34 +257,40 @@ function ProductCarousel({
                   onClick={() => onProductClick(p)}
                   className="block focus-visible:ring-2"
                 >
+                  <div
+                    className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full overflow-hidden rounded-md`}
+                    style={{ backgroundColor: theme.colors.surface }}
+                  >
+                    {p.image ? (
+                      <img
+                        src={p.image}
+                        alt={p.title}
+                        className="h-full w-full rounded-md object-contain"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="h-full w-full" style={{ backgroundColor: theme.colors.border }} />
+                    )}
+                  </div>
+                </a>
+              ) : (
+                <div
+                  className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full overflow-hidden rounded-md`}
+                  style={{ backgroundColor: theme.colors.surface }}
+                >
                   {p.image ? (
                     <img
                       src={p.image}
                       alt={p.title}
-                      className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full rounded-md object-contain`}
+                      className="h-full w-full rounded-md object-contain"
                       loading="lazy"
                       decoding="async"
                     />
                   ) : (
-                    <div
-                      className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full rounded-md`}
-                      style={{ backgroundColor: theme.colors.border }}
-                    />
+                    <div className="h-full w-full" style={{ backgroundColor: theme.colors.border }} />
                   )}
-                </a>
-              ) : p.image ? (
-                <img
-                  src={p.image}
-                  alt={p.title}
-                  className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full rounded-md object-contain`}
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <div
-                  className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full rounded-md`}
-                  style={{ backgroundColor: theme.colors.border }}
-                />
+                </div>
               )}
               <div className="min-h-0 min-w-0 flex-1">
                 {url ? (
@@ -330,6 +349,26 @@ function ProductCarousel({
           );
         })}
       </div>
+      {products.length > 1 && (
+        <div className="flex items-center justify-center gap-1.5 pt-1" aria-label="Indicador de paginação">
+          {products.map((p, i) => (
+            <button
+              key={p.id}
+              type="button"
+              aria-label={`Ir para o produto ${i + 1}`}
+              onClick={() => {
+                const track = trackRef.current;
+                if (track) track.scrollTo({ left: i * (cardWidth + 12), behavior: "smooth" });
+              }}
+              className="h-2.5 w-2.5 rounded-full transition-all focus-visible:ring-2"
+              style={{
+                backgroundColor: i === activeIndex ? theme.colors.primary : theme.colors.border,
+                width: i === activeIndex ? 18 : 10,
+              }}
+            />
+          ))}
+        </div>
+      )}
       {products.length > 1 && (
         <div className="flex items-center justify-center gap-2 pt-1" aria-label="Controles do carrossel">
           <button
