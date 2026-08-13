@@ -163,7 +163,7 @@ function ProductCarousel({
   const pausedRef = useRef(false);
 
   const cardWidth = layout === "masked" ? 240 : 320;
-  const cardHeight = layout === "masked" ? "h-[17rem]" : "h-[19rem]";
+  const cardHeight = layout === "masked" ? "h-[16.5rem]" : "h-[18.5rem]";
 
   // Atualiza o índice ativo conforme o scroll do track (indicador de paginação).
   useEffect(() => {
