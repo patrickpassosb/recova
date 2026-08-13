@@ -216,6 +216,16 @@ export default function Hero({ slides, categories = [], infoBullets = [], interv
           giving the home page the H1 it needs for semantic structure/a11y. */}
       <h1 className="sr-only">{first.headline ?? "Recova — A segunda chance da sua busca"}</h1>
       <div className="flex h-screen flex-col gap-2 pt-17 pb-3 sm:pt-15">
+        {/* Recova tagline overlay — brand identity on the home hero */}
+        <div className="flex items-center justify-center gap-2 rounded-sm bg-[#102A43] px-4 py-2.5">
+          <span className="text-sm font-semibold tracking-[-0.1px] text-white sm:text-base">
+            Recova
+          </span>
+          <span className="hidden h-4 w-px bg-white/30 sm:block" />
+          <span className="text-xs font-normal text-white/90 sm:text-sm">
+            A segunda chance da sua busca
+          </span>
+        </div>
         {/* Carousel — each slide's own background (mobile/desktop crop), logo and featured products. */}
         <div className="flex min-h-0 flex-1 flex-col">
           <div id={id} className="relative min-h-0 flex-1">

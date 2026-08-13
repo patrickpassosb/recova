@@ -123,7 +123,7 @@ const Mobile = ({ logo, searchbar }: Props) => (
 function Header({
   alerts = [],
   logo = {
-    src: "/recova/logo-horizontal-branco.svg",
+    src: "/recova/logo-horizontal.svg",
     width: 120,
     height: 36,
     alt: "Recova",

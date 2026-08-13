@@ -100,7 +100,7 @@ export default function HeaderNav({ navItems, logo, shippingNote }: Props) {
       >
         {logo && (
           <Link to="/" aria-label="Home" className="mr-2 flex shrink-0 items-center">
-            <Image
+            <img
               src={logo.src}
               alt={logo.alt}
               width={logo.width ?? 88}
