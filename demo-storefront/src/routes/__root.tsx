@@ -38,20 +38,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Storefront-tanstack" },
+      { title: "Recova — A segunda chance da sua busca" },
       {
         name: "description",
         content:
-          "Shop the new season at Storefront-tanstack — apparel, accessories and more, with up to 60% off.",
+          "Recova recupera buscas sem resultado: encontre produtos relevantes, converse com o assistente e finalize a compra.",
       },
       // Open Graph / Twitter defaults so shared links render a preview card.
       { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "Storefront-tanstack" },
-      { property: "og:title", content: "Storefront-tanstack" },
+      { property: "og:site_name", content: "Recova" },
+      { property: "og:title", content: "Recova — A segunda chance da sua busca" },
       {
         property: "og:description",
         content:
-          "Shop the new season at Storefront-tanstack — apparel, accessories and more, with up to 60% off.",
+          "Recova recupera buscas sem resultado: encontre produtos relevantes, converse com o assistente e finalize a compra.",
       },
       {
         property: "og:image",

@@ -9,10 +9,10 @@
   },
   "alerts": [],
   "logo": {
-    "src": "https://decoims.com/decocms/e8c6326e-e009-4e3c-9787-b2fe25a1b993/deco-logo.png",
-    "alt": "Deco Storefront",
-    "width": 67,
-    "height": 28
+    "src": "/recova/logo-horizontal-branco.svg",
+    "alt": "Recova",
+    "width": 120,
+    "height": 36
   },
   "navItems": [
     {

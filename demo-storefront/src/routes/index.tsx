@@ -10,8 +10,8 @@ const isServer = typeof document === "undefined";
 const IGNORED_SEARCH_PARAMS = new Set(["skuId"]);
 
 const baseConfig = cmsHomeRouteConfig({
-  defaultTitle: "Storefront-tanstack",
-  siteName: "Storefront-tanstack",
+  defaultTitle: "Recova — A segunda chance da sua busca",
+  siteName: "Recova",
   // Keep the previous route UI visible while the loader re-runs on filter/sort
   // navigation. Without this, framework defaults (pendingMs=200) flash the
   // pending UI and the page looks like a hard reload. The deferred SearchResult

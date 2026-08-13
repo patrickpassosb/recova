@@ -214,7 +214,7 @@ export default function Hero({ slides, categories = [], infoBullets = [], interv
     <div className="flex flex-col gap-2 px-3">
       {/* Page main heading — visually hidden to preserve the hero's design while
           giving the home page the H1 it needs for semantic structure/a11y. */}
-      <h1 className="sr-only">{first.headline ?? "Deco Storefront"}</h1>
+      <h1 className="sr-only">{first.headline ?? "Recova — A segunda chance da sua busca"}</h1>
       <div className="flex h-screen flex-col gap-2 pt-17 pb-3 sm:pt-15">
         {/* Carousel — each slide's own background (mobile/desktop crop), logo and featured products. */}
         <div className="flex min-h-0 flex-1 flex-col">
