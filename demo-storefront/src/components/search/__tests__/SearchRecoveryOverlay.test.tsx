@@ -216,14 +216,14 @@ describe("SearchRecoveryOverlay", () => {
     const masked = renderOverlay({ variant: "inline", carouselLayout: "masked" });
     await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
     expect(screen.getByText("Tênis de lona confortável para o dia a dia.").className).toContain(
-      "line-clamp-2",
+      "line-clamp-1",
     );
 
     masked.unmount();
     renderOverlay({ variant: "inline", carouselLayout: "wide" });
     await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
     expect(screen.getByText("Tênis de lona confortável para o dia a dia.").className).toContain(
-      "line-clamp-2",
+      "line-clamp-1",
     );
   });
 

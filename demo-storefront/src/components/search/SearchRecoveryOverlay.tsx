@@ -295,11 +295,7 @@ function ProductCarousel({
                 </p>
                 {p.description?.trim() && (
                   <p
-                    className={
-                      layout === "masked"
-                        ? "mt-2 line-clamp-2 text-xs leading-relaxed"
-                        : "mt-3 line-clamp-2 text-sm leading-relaxed"
-                    }
+                    className="mt-2 line-clamp-1 text-xs leading-relaxed"
                     style={{ color: theme.colors.muted }}
                   >
                     {p.description.trim()}
@@ -340,8 +336,8 @@ function ProductCarousel({
             type="button"
             onClick={() => move(-1)}
             aria-label="Produto anterior"
-            className="flex size-10 items-center justify-center rounded-full border text-lg focus-visible:ring-2"
-            style={{ borderColor: theme.colors.border, color: theme.colors.primary }}
+            className="flex size-11 items-center justify-center rounded-full border text-lg focus-visible:ring-2 hover:opacity-80"
+            style={{ borderColor: theme.colors.border, color: theme.colors.primary, backgroundColor: theme.colors.cardBg }}
           >
             ‹
           </button>
@@ -349,8 +345,8 @@ function ProductCarousel({
             type="button"
             onClick={() => setRotationPaused((paused) => !paused)}
             aria-label={rotationPaused ? "Retomar rotação" : "Pausar rotação"}
-            className="flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-semibold focus-visible:ring-2"
-            style={{ borderColor: theme.colors.border, color: theme.colors.primary }}
+            className="flex h-11 min-w-11 items-center justify-center rounded-full border px-3 text-xs font-semibold focus-visible:ring-2 hover:opacity-80"
+            style={{ borderColor: theme.colors.border, color: theme.colors.primary, backgroundColor: theme.colors.cardBg }}
           >
             {rotationPaused ? "▶" : "Ⅱ"}
           </button>
@@ -358,8 +354,8 @@ function ProductCarousel({
             type="button"
             onClick={() => move(1)}
             aria-label="Próximo produto"
-            className="flex size-10 items-center justify-center rounded-full border text-lg focus-visible:ring-2"
-            style={{ borderColor: theme.colors.border, color: theme.colors.primary }}
+            className="flex size-11 items-center justify-center rounded-full border text-lg focus-visible:ring-2 hover:opacity-80"
+            style={{ borderColor: theme.colors.border, color: theme.colors.primary, backgroundColor: theme.colors.cardBg }}
           >
             ›
           </button>
@@ -849,7 +845,7 @@ export default function SearchRecoveryOverlay({
                           type="button"
                           onClick={() => handleSend(chip)}
                           disabled={thinking}
-                          className="rounded-full border px-3.5 py-2 text-xs font-semibold transition-all hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                          className="rounded-full border px-4 py-2 text-xs font-semibold transition-all hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
                           style={{
                             borderColor: theme.colors.primary,
                             color: theme.colors.primary,
