@@ -417,6 +417,7 @@ export default function SearchRecoveryOverlay({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [flow, setFlow] = useState<FlowState>({ status: "loading" });
   const [input, setInput] = useState("");
+  const [selectedChip, setSelectedChip] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   const sessionRef = useRef<string | null>(null);
   const closedRef = useRef(false);
@@ -878,30 +879,40 @@ export default function SearchRecoveryOverlay({
                       O que você prefere?
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {msg.refinementOptions.map((chip) => (
-                        <button
-                          key={chip}
-                          type="button"
-                          onClick={() => handleSend(chip)}
-                          disabled={thinking}
-                          className="rounded-full border px-4 py-2 text-xs font-semibold transition-all hover:bg-opacity-100 focus-visible:ring-2 disabled:opacity-40"
-                          style={{
-                            borderColor: theme.colors.primary,
-                            color: theme.colors.primary,
-                            backgroundColor: "transparent",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = theme.colors.primary;
-                            e.currentTarget.style.color = "#FFFFFF";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "transparent";
-                            e.currentTarget.style.color = theme.colors.primary;
-                          }}
-                        >
-                          {chip}
-                        </button>
-                      ))}
+                      {msg.refinementOptions.map((chip) => {
+                        const isActive = selectedChip === chip;
+                        return (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => {
+                              setSelectedChip(chip);
+                              handleSend(chip);
+                            }}
+                            disabled={thinking}
+                            className="rounded-full border px-4 py-2 text-xs font-semibold transition-all hover:bg-opacity-100 focus-visible:ring-2 disabled:opacity-40"
+                            style={{
+                              borderColor: theme.colors.primary,
+                              color: isActive ? "#FFFFFF" : theme.colors.primary,
+                              backgroundColor: isActive ? theme.colors.primary : "transparent",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (selectedChip !== chip) {
+                                e.currentTarget.style.backgroundColor = theme.colors.primary;
+                                e.currentTarget.style.color = "#FFFFFF";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (selectedChip !== chip) {
+                                e.currentTarget.style.backgroundColor = "transparent";
+                                e.currentTarget.style.color = theme.colors.primary;
+                              }
+                            }}
+                          >
+                            {chip}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -945,19 +956,23 @@ export default function SearchRecoveryOverlay({
           <div
             className="flex flex-col gap-3 rounded-lg border p-3 text-sm"
             style={{
-              backgroundColor: theme.colors.success,
-              borderColor: theme.colors.success,
-              color: "#FFFFFF",
+              backgroundColor: `${theme.colors.success}14`,
+              borderColor: `${theme.colors.success}40`,
+              color: theme.colors.text,
             }}
           >
             <div className="flex items-center gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" stroke="#FFFFFF" strokeWidth="2" />
-                <path d="M8 12.5l2.5 2.5L16 9.5" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="10" stroke={theme.colors.success} strokeWidth="2" />
+                <path d="M8 12.5l2.5 2.5L16 9.5" stroke={theme.colors.success} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="font-semibold text-white">{theme.copy.buySuccessTitle}</span>
+              <span className="font-semibold" style={{ color: theme.colors.success }}>
+                {theme.copy.buySuccessTitle}
+              </span>
             </div>
-            <p className="text-sm text-white/90">{theme.copy.buySuccessSubtitle}.</p>
+            <p className="text-sm" style={{ color: theme.colors.muted }}>
+              {theme.copy.buySuccessSubtitle}.
+            </p>
             <div className="flex gap-2">
               <button
                 type="button"
