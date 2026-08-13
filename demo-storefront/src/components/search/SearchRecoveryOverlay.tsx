@@ -334,8 +334,8 @@ function ProductCarousel({
                   <p
                     className={
                       layout === "masked"
-                        ? "mt-2 line-clamp-3 text-xs leading-relaxed"
-                        : "mt-3 line-clamp-5 text-sm leading-relaxed"
+                        ? "mt-2 line-clamp-2 text-xs leading-relaxed"
+                        : "mt-3 line-clamp-2 text-sm leading-relaxed"
                     }
                     style={{ color: theme.colors.muted }}
                   >
@@ -995,8 +995,8 @@ export default function SearchRecoveryOverlay({
           />
           <button
             type="submit"
-            disabled={thinking || flow.status === "loading" || !input.trim()}
-            className="rounded-md px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-40"
+            disabled={thinking || flow.status === "loading"}
+            className="rounded-md px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-50"
             style={{ backgroundColor: theme.colors.primary }}
           >
             {theme.copy.send}
