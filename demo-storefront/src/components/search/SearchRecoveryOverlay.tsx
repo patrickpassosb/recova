@@ -162,7 +162,7 @@ function ProductCarousel({
   const pausedRef = useRef(false);
 
   const cardWidth = layout === "masked" ? 240 : 320;
-  const cardHeight = layout === "masked" ? "h-[22.5rem]" : "h-[27.5rem]";
+  const cardHeight = layout === "masked" ? "h-[21rem]" : "h-[25rem]";
 
   // Autoplay: avança o scroll suavemente a cada 3s (pausa em hover/foco/toque).
   useEffect(() => {
@@ -248,13 +248,13 @@ function ProductCarousel({
                     <img
                       src={p.image}
                       alt={p.title}
-                      className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md object-contain`}
+                      className={`${layout === "masked" ? "h-24" : "h-[7.5rem]"} w-full rounded-md object-contain`}
                       loading="lazy"
                       decoding="async"
                     />
                   ) : (
                     <div
-                      className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md`}
+                      className={`${layout === "masked" ? "h-24" : "h-[7.5rem]"} w-full rounded-md`}
                       style={{ backgroundColor: theme.colors.border }}
                     />
                   )}
@@ -263,13 +263,13 @@ function ProductCarousel({
                 <img
                   src={p.image}
                   alt={p.title}
-                  className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md object-contain`}
+                  className={`${layout === "masked" ? "h-24" : "h-[7.5rem]"} w-full rounded-md object-contain`}
                   loading="lazy"
                   decoding="async"
                 />
               ) : (
                 <div
-                  className={`${layout === "masked" ? "h-28" : "h-[8.75rem]"} w-full rounded-md`}
+                  className={`${layout === "masked" ? "h-24" : "h-[7.5rem]"} w-full rounded-md`}
                   style={{ backgroundColor: theme.colors.border }}
                 />
               )}

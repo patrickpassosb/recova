@@ -201,7 +201,7 @@ describe("SearchRecoveryOverlay", () => {
     const maskedCarousel = screen.getByRole("region", { name: "Produtos recomendados" });
     expect(maskedCarousel.getAttribute("data-carousel-layout")).toBe("masked");
     expect(maskedCarousel.querySelector("[data-card]")?.className).toContain("snap-center");
-    expect(maskedCarousel.querySelector("[data-card]")?.className).toContain("h-[22.5rem]");
+    expect(maskedCarousel.querySelector("[data-card]")?.className).toContain("h-[21rem]");
 
     masked.unmount();
     renderOverlay({ variant: "inline", carouselLayout: "wide" });
@@ -209,7 +209,7 @@ describe("SearchRecoveryOverlay", () => {
     const wideCarousel = screen.getByRole("region", { name: "Produtos recomendados" });
     expect(wideCarousel.getAttribute("data-carousel-layout")).toBe("wide");
     expect(wideCarousel.querySelector("[data-card]")?.className).toContain("snap-center");
-    expect(wideCarousel.querySelector("[data-card]")?.className).toContain("h-[27.5rem]");
+    expect(wideCarousel.querySelector("[data-card]")?.className).toContain("h-[25rem]");
   });
 
   it("shows Shopify product descriptions in compact and wide layouts", async () => {
