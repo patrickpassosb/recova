@@ -152,6 +152,7 @@ function Result({
               sortOptions={sortOptions}
               url={href}
               filterDrawerId={filterDrawerId}
+              hideEmptyCount={isZeroResults}
             />
 
             {isRouteLoading ? (

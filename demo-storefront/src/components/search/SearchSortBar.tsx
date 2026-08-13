@@ -7,6 +7,8 @@ export interface Props {
   sortOptions: ProductListingPage["sortOptions"];
   url: string;
   filterDrawerId?: string;
+  /** Quando true, oculta o contador "0 resultados" (o overlay Recova já comunica a recuperação). */
+  hideEmptyCount?: boolean;
 }
 
 export default function SearchSortBar({
@@ -15,12 +17,15 @@ export default function SearchSortBar({
   sortOptions,
   url,
   filterDrawerId,
+  hideEmptyCount,
 }: Props) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-xs text-muted">
         {totalRecords === 0
-          ? "0 resultados"
+          ? hideEmptyCount
+            ? ""
+            : "0 resultados"
           : `${recordPerPage} de ${totalRecords} ${totalRecords === 1 ? "resultado" : "resultados"}`}
       </span>
 
