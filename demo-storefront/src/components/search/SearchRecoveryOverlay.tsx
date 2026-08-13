@@ -162,7 +162,7 @@ function ProductCarousel({
   const pausedRef = useRef(false);
 
   const cardWidth = layout === "masked" ? 240 : 320;
-  const cardHeight = layout === "masked" ? "h-[19rem]" : "h-[22rem]";
+  const cardHeight = layout === "masked" ? "h-[17rem]" : "h-[19rem]";
 
   // Autoplay: avança o scroll suavemente a cada 3s (pausa em hover/foco/toque).
   useEffect(() => {
@@ -248,13 +248,13 @@ function ProductCarousel({
                     <img
                       src={p.image}
                       alt={p.title}
-                      className={`${layout === "masked" ? "h-20" : "h-[6.5rem]"} w-full rounded-md object-contain`}
+                      className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full rounded-md object-contain`}
                       loading="lazy"
                       decoding="async"
                     />
                   ) : (
                     <div
-                      className={`${layout === "masked" ? "h-20" : "h-[6.5rem]"} w-full rounded-md`}
+                      className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full rounded-md`}
                       style={{ backgroundColor: theme.colors.border }}
                     />
                   )}
@@ -263,13 +263,13 @@ function ProductCarousel({
                 <img
                   src={p.image}
                   alt={p.title}
-                  className={`${layout === "masked" ? "h-20" : "h-[6.5rem]"} w-full rounded-md object-contain`}
+                  className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full rounded-md object-contain`}
                   loading="lazy"
                   decoding="async"
                 />
               ) : (
                 <div
-                  className={`${layout === "masked" ? "h-20" : "h-[6.5rem]"} w-full rounded-md`}
+                  className={`${layout === "masked" ? "h-16" : "h-[5.5rem]"} w-full rounded-md`}
                   style={{ backgroundColor: theme.colors.border }}
                 />
               )}
