@@ -945,23 +945,19 @@ export default function SearchRecoveryOverlay({
           <div
             className="flex flex-col gap-3 rounded-lg border p-3 text-sm"
             style={{
-              backgroundColor: `${theme.colors.success}14`,
-              borderColor: `${theme.colors.success}40`,
-              color: theme.colors.text,
+              backgroundColor: theme.colors.success,
+              borderColor: theme.colors.success,
+              color: "#FFFFFF",
             }}
           >
             <div className="flex items-center gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" stroke={theme.colors.success} strokeWidth="2" />
-                <path d="M8 12.5l2.5 2.5L16 9.5" stroke={theme.colors.success} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="10" stroke="#FFFFFF" strokeWidth="2" />
+                <path d="M8 12.5l2.5 2.5L16 9.5" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="font-semibold" style={{ color: theme.colors.success }}>
-                {theme.copy.buySuccessTitle}
-              </span>
+              <span className="font-semibold text-white">{theme.copy.buySuccessTitle}</span>
             </div>
-            <p className="text-sm" style={{ color: theme.colors.muted }}>
-              {theme.copy.buySuccessSubtitle}.
-            </p>
+            <p className="text-sm text-white/90">{theme.copy.buySuccessSubtitle}.</p>
             <div className="flex gap-2">
               <button
                 type="button"
