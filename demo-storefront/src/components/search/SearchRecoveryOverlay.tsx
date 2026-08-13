@@ -67,7 +67,11 @@ export function getLatestRefinementOptions(
     ?.refinementOptions;
 }
 
-type FlowState = { status: "loading" } | { status: "chat" } | { status: "success" }; // ✅ verde
+type FlowState =
+  | { status: "loading" }
+  | { status: "chat" }
+  | { status: "success" } // ✅ verde (comprou)
+  | { status: "failed" }; // ❌ vermelho (desistiu — reengajamento esgotado)
 
 const REENGAGEMENT_DELAY_MS = 60_000;
 
@@ -556,6 +560,16 @@ export default function SearchRecoveryOverlay({
               interaction_type: "reengagement",
             });
           }
+          // Reengajamento esgotado (máx 2 tentativas) e cliente não converteu
+          // → estado terminal ❌ vermelho (desistiu).
+          if (exhausted) {
+            setFlow({ status: "failed" });
+            track({
+              event: "recova_abandoned",
+              session_id: sessionId,
+              interaction_type: "abandoned",
+            });
+          }
         } catch {
           // reengajamento é best-effort — nunca quebra o chat
         }
@@ -733,6 +747,7 @@ export default function SearchRecoveryOverlay({
   };
 
   const isSuccess = flow.status === "success";
+  const isFailed = flow.status === "failed";
   const latestProductMessageIndex = messages.reduce(
     (latest, message, index) =>
       message.role === "agent" && message.products?.length ? index : latest,
@@ -967,10 +982,48 @@ export default function SearchRecoveryOverlay({
             </div>
           </div>
         )}
+        {isFailed && (
+          <div
+            className="flex flex-col gap-3 rounded-lg border p-3 text-sm"
+            style={{
+              backgroundColor: `${theme.colors.danger}14`,
+              borderColor: `${theme.colors.danger}40`,
+              color: theme.colors.text,
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke={theme.colors.danger} strokeWidth="2" />
+                <path d="M15 9l-6 6M9 9l6 6" stroke={theme.colors.danger} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="font-semibold" style={{ color: theme.colors.danger }}>
+                {theme.copy.failedTitle}
+              </span>
+            </div>
+            <p className="text-sm" style={{ color: theme.colors.muted }}>
+              {theme.copy.failedSubtitle}.
+            </p>
+            <p className="text-sm" style={{ color: theme.colors.muted }}>
+              {theme.copy.failedBody}
+            </p>
+            <button
+              type="button"
+              onClick={close}
+              className="rounded-md border px-3 py-2 text-xs font-semibold transition-opacity hover:opacity-80"
+              style={{
+                borderColor: theme.colors.primary,
+                color: theme.colors.primary,
+                backgroundColor: "transparent",
+              }}
+            >
+              Fechar
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Input (escondido no estado terminal) */}
-      {!isSuccess && (
+      {/* Input (escondido nos estados terminais) */}
+      {!isSuccess && !isFailed && (
         <form
           onSubmit={(e) => {
             e.preventDefault();

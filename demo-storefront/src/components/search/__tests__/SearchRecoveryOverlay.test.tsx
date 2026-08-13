@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, beforeEach } from "bun:test";
+import { describe, it, expect, afterEach, beforeEach, vi } from "bun:test";
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SearchRecoveryOverlay, {
@@ -325,5 +325,44 @@ describe("SearchRecoveryOverlay", () => {
     await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
     const branding = screen.getByRole("link", { name: /Powered by Recova/i });
     expect(branding.getAttribute("href")).toBe("https://recova.gabrielsacilotto.com.br/");
+  });
+
+  it("shows the red failed state when reengagement is exhausted", async () => {
+    // Reengage esgotado (máx 2 tentativas) e cliente não converteu → ❌ vermelho.
+    globalThis.fetch = (async (input: any, init?: any) => {
+      if (!String(input).includes("/deco/invoke/")) {
+        throw new Error(`Unexpected fetch in component test: ${input}`);
+      }
+      const body = String(init?.body ?? "");
+      const isReengage = body.includes("reengage");
+      return new Response(
+        JSON.stringify(
+          isReengage
+            ? { message: "", attempt: 2, exhausted: true }
+            : agentResult,
+        ),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    // Fake timers + relógio ANTES de renderizar para que o timer de
+    // reengajamento (60s) seja agendado com o relógio fake.
+    vi.useFakeTimers({ now: new Date("2026-08-13T00:00:00Z") });
+    renderOverlay({ variant: "inline" });
+    await waitFor(() => expect(screen.getByText(/Encontrei tênis/i)).toBeTruthy());
+
+    // Avança 61s → dispara o reengage → esgotado → estado ❌ vermelho.
+    vi.advanceTimersByTime(61_000);
+    // Flush microtasks (ainda em fake timers) para a continuação async do
+    // reengage resolver e chamar setFlow({status:"failed"}).
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    // Volta para timers reais para o waitFor funcionar.
+    vi.useRealTimers();
+    await waitFor(() => {
+      expect(screen.getByText("Sem conversão")).toBeTruthy();
+    });
+    expect(screen.getByText(/não adicionou nada ao carrinho/i)).toBeTruthy();
   });
 });
