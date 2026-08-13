@@ -200,6 +200,14 @@ function HeroSlide({
           />
         </div>
       )}
+
+      {/* Brand overlay — tones the slide's background toward the Recova palette
+          (navy → transparent) so off-brand banner colors (e.g. lime) don't clash
+          with the brand book. Kept subtle so product imagery stays legible. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#102A43]/70 via-[#102A43]/20 to-transparent"
+      />
     </div>
   );
 }
