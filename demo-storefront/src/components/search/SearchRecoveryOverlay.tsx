@@ -921,19 +921,50 @@ export default function SearchRecoveryOverlay({
 
         {isSuccess && (
           <div
-            className="flex items-center gap-2 rounded-lg p-3 text-sm"
+            className="flex flex-col gap-3 rounded-lg border p-3 text-sm"
             style={{
-              backgroundColor: `${theme.colors.success}1A`,
-              color: theme.colors.success,
+              backgroundColor: `${theme.colors.success}14`,
+              borderColor: `${theme.colors.success}40`,
+              color: theme.colors.text,
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" stroke={theme.colors.success} strokeWidth="2" />
-              <path d="M8 12.5l2.5 2.5L16 9.5" stroke={theme.colors.success} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>
-              {theme.copy.buySuccessTitle} {theme.copy.buySuccessSubtitle.toLowerCase()}.
-            </span>
+            <div className="flex items-center gap-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke={theme.colors.success} strokeWidth="2" />
+                <path d="M8 12.5l2.5 2.5L16 9.5" stroke={theme.colors.success} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="font-semibold" style={{ color: theme.colors.success }}>
+                {theme.copy.buySuccessTitle}
+              </span>
+            </div>
+            <p className="text-sm" style={{ color: theme.colors.muted }}>
+              {theme.copy.buySuccessSubtitle}.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const checkoutUrl = cart?.checkoutUrl;
+                  if (checkoutUrl) window.location.href = checkoutUrl;
+                }}
+                className="flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-80"
+                style={{ backgroundColor: theme.colors.primary }}
+              >
+                Finalizar compra
+              </button>
+              <button
+                type="button"
+                onClick={close}
+                className="flex-1 rounded-md border px-3 py-2 text-xs font-semibold transition-opacity hover:opacity-80"
+                style={{
+                  borderColor: theme.colors.primary,
+                  color: theme.colors.primary,
+                  backgroundColor: "transparent",
+                }}
+              >
+                Continuar comprando
+              </button>
+            </div>
           </div>
         )}
       </div>
