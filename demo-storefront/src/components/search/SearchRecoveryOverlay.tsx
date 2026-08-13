@@ -162,7 +162,7 @@ function ProductCarousel({
   const pausedRef = useRef(false);
 
   const cardWidth = layout === "masked" ? 240 : 320;
-  const cardHeight = layout === "masked" ? "h-[21rem]" : "h-[25rem]";
+  const cardHeight = layout === "masked" ? "h-[19rem]" : "h-[22rem]";
 
   // Autoplay: avança o scroll suavemente a cada 3s (pausa em hover/foco/toque).
   useEffect(() => {
@@ -248,13 +248,13 @@ function ProductCarousel({
                     <img
                       src={p.image}
                       alt={p.title}
-                      className={`${layout === "masked" ? "h-24" : "h-[7.5rem]"} w-full rounded-md object-contain`}
+                      className={`${layout === "masked" ? "h-20" : "h-[6.5rem]"} w-full rounded-md object-contain`}
                       loading="lazy"
                       decoding="async"
                     />
                   ) : (
                     <div
-                      className={`${layout === "masked" ? "h-24" : "h-[7.5rem]"} w-full rounded-md`}
+                      className={`${layout === "masked" ? "h-20" : "h-[6.5rem]"} w-full rounded-md`}
                       style={{ backgroundColor: theme.colors.border }}
                     />
                   )}
@@ -263,13 +263,13 @@ function ProductCarousel({
                 <img
                   src={p.image}
                   alt={p.title}
-                  className={`${layout === "masked" ? "h-24" : "h-[7.5rem]"} w-full rounded-md object-contain`}
+                  className={`${layout === "masked" ? "h-20" : "h-[6.5rem]"} w-full rounded-md object-contain`}
                   loading="lazy"
                   decoding="async"
                 />
               ) : (
                 <div
-                  className={`${layout === "masked" ? "h-24" : "h-[7.5rem]"} w-full rounded-md`}
+                  className={`${layout === "masked" ? "h-20" : "h-[6.5rem]"} w-full rounded-md`}
                   style={{ backgroundColor: theme.colors.border }}
                 />
               )}
@@ -766,7 +766,7 @@ export default function SearchRecoveryOverlay({
       <div
         ref={messagesContainerRef}
         data-chat-scroll
-        className="flex max-h-[50vh] min-h-40 flex-col gap-3 overflow-y-auto p-4"
+        className="flex max-h-[68vh] min-h-40 flex-col gap-3 overflow-y-auto p-4"
         style={{ backgroundColor: theme.colors.surface }}
       >
         {flow.status === "loading" && (
@@ -779,18 +779,18 @@ export default function SearchRecoveryOverlay({
         {/* Mensagem explícita de zero resultados — o agente entrou porque a busca nativa não achou nada */}
         {flow.status === "chat" && (
           <div
-            className="rounded-lg border p-3 text-sm"
+            className="rounded-lg border px-3 py-2 text-sm"
             style={{
               borderColor: theme.colors.border,
               backgroundColor: theme.colors.cardBg,
               color: theme.colors.text,
             }}
           >
-            <p className="font-semibold" style={{ color: theme.colors.accent }}>
+            <p className="font-semibold leading-tight" style={{ color: theme.colors.accent }}>
               Não encontramos exatamente "{term}"
             </p>
-            <p className="mt-1" style={{ color: theme.colors.muted }}>
-              Mas separamos algumas opções que podem atender ao que você procura. Veja abaixo e refine com os chips.
+            <p className="mt-0.5 leading-snug" style={{ color: theme.colors.muted }}>
+              Mas separamos algumas opções que podem atender ao que você procura.
             </p>
           </div>
         )}
