@@ -845,11 +845,19 @@ export default function SearchRecoveryOverlay({
                           type="button"
                           onClick={() => handleSend(chip)}
                           disabled={thinking}
-                          className="rounded-full border px-4 py-2 text-xs font-semibold transition-all hover:opacity-80 focus-visible:ring-2 disabled:opacity-40"
+                          className="rounded-full border px-4 py-2 text-xs font-semibold transition-all hover:bg-opacity-100 focus-visible:ring-2 disabled:opacity-40"
                           style={{
                             borderColor: theme.colors.primary,
                             color: theme.colors.primary,
                             backgroundColor: "transparent",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.colors.primary;
+                            e.currentTarget.style.color = "#FFFFFF";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.color = theme.colors.primary;
                           }}
                         >
                           {chip}
