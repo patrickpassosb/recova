@@ -45,8 +45,22 @@ No token budgets — free spend with full accounting. Structural bounds only: `m
 - **Lesson 1:** vision capability is harness-config, not model reality — declare `input:["text","image"]` in models.json or `read` strips images.
 - **Lesson 2:** V1 "tests pass" claims from the earlier hackathon were only true with a live LLM key; network-gated tests must be opt-in (`RUN_LLM_LIVE=1`).
 
+### D2 — recova-v2-day2-domain-catalog (2026-08-21)
+
+- **Scope:** W04 recovery domain, W06 catalog importer, W06 adapter seam.
+- **Agents:** 9 (impl+review+fix per phase; W04 implementer hit the 40-min timeout on attempt 1 but wrote all files — reviewer validated on disk; ledger recorded the timeout as failed, code was real and reviewed).
+- **Tokens:** 6.52M (4x D1 — big-model reviewers read full domain code; flash-vacuum optimization not yet applied to reviewer prompts).
+- **Reviews:** all 3 phases FAILED first pass, all fixed by fixers:
+  - W04: regex `while(exec)` infinity loop without `g` flag (test suite timeout), hard-constraint bypass via same-kind soft constraint (the real security-class bug the plan exists to prevent).
+  - W06-catalog: signed image URLs broke byte-determinism; dev fixture was 100% apparel (500/500, no diversity).
+  - W06-adapter: forbidden token string literal in an error message.
+- **Orchestrator verify after run:** 92 tests pass bare exit 0, tsc exit 0, fixture histogram confirms 40% apparel + diverse rest, forbidden-token grep clean (remaining hits are config field names, not secrets). mcp-app + demo-storefront untouched and green.
+- **Lesson 3:** first-pass fail rate 60% across 2 days — reviewers with write-revert-revert failing-test power catch semantic bugs compile-test loops miss. Keep.
+- **Lesson 4:** implementer reports can be lost on timeout while their writes persist; orchestrator must verify disk state as the source of truth before recording failure.
+
 ## Daily spend
 
 | Day | Workflow tokens | Cost | Notes |
 |---|---|---|---|
 | D1 (2026-08-20) | 1.6M | $0.99 | 9 agents, W00/W02/W03 complete |
+| D2-a (2026-08-21) | 0.6M | ~$0.40 est | CI fixes: stale lockfiles, gitignored codegen, V1 test-hardening |
