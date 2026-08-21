@@ -55,6 +55,8 @@ jobs:
       # bun.lock is the canonical lockfile (V1 dev flow); package-lock.json was stale and is removed
       - run: bun install --frozen-lockfile
       - run: npm run format:check
+      # src/routeTree.gen.ts is generated (gitignored); CI must regenerate before tsc
+      - run: npx tsr generate
       - run: npm run typecheck
       - run: bun test --preload ./src/test/setup.ts
 
