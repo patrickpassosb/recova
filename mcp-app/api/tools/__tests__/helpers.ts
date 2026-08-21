@@ -414,6 +414,11 @@ const originalFetch = globalThis.fetch;
  * while keeping every call deterministic and offline. Returns a cleanup fn.
  */
 export function stubNetwork(opts: StubOptions = {}): () => void {
+	const hadKey = process.env.OLLAMA_API_KEY;
+	// chat() exige uma chave para chamar o endpoint; o stub precisa fingir que
+	// ela existe para o caminho "LLM disponível" ser exercitado offline.
+	process.env.OLLAMA_API_KEY = hadKey || "stubbed-test-key";
+
 	globalThis.fetch = (async (input: RequestInfo | URL) => {
 		const url = String(input);
 
@@ -453,6 +458,11 @@ export function stubNetwork(opts: StubOptions = {}): () => void {
 
 	return () => {
 		globalThis.fetch = originalFetch;
+		if (hadKey === undefined) {
+			delete process.env.OLLAMA_API_KEY;
+		} else {
+			process.env.OLLAMA_API_KEY = hadKey;
+		}
 	};
 }
 

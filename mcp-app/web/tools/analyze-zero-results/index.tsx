@@ -11,7 +11,10 @@ import type {
 	AnalyzeZeroResultsOutput,
 } from "../../../api/tools/analyzeZeroResults.ts";
 
-const CAUSE_LABEL: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+const CAUSE_LABEL: Record<
+	string,
+	{ label: string; variant: "default" | "secondary" | "destructive" }
+> = {
 	typo: { label: "typo", variant: "destructive" },
 	sinonimo: { label: "sinônimo", variant: "default" },
 	nao_catalogado: { label: "não catalogado", variant: "secondary" },
@@ -19,14 +22,19 @@ const CAUSE_LABEL: Record<string, { label: string; variant: "default" | "seconda
 };
 
 export default function AnalyzeZeroResultsPage() {
-	const state = useMcpState<AnalyzeZeroResultsInput, AnalyzeZeroResultsOutput>();
+	const state = useMcpState<
+		AnalyzeZeroResultsInput,
+		AnalyzeZeroResultsOutput
+	>();
 
 	if (state.status === "initializing" || state.status === "connected") {
 		return (
 			<div className="flex items-center justify-center min-h-dvh p-6">
 				<div className="flex items-center gap-3 text-muted-foreground">
 					<span className="w-4 h-4 border-2 border-muted border-t-primary rounded-full animate-spin" />
-					<span className="text-sm">Analisando buscas com zero resultados...</span>
+					<span className="text-sm">
+						Analisando buscas com zero resultados...
+					</span>
 				</div>
 			</div>
 		);
@@ -66,7 +74,9 @@ export default function AnalyzeZeroResultsPage() {
 			<div className="mx-auto max-w-2xl space-y-4">
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-lg">🔍 Análise de Zero Resultados</CardTitle>
+						<CardTitle className="text-lg">
+							🔍 Análise de Zero Resultados
+						</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-4">
 						<p className="text-sm text-muted-foreground">{result.summary}</p>

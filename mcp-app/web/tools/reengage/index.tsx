@@ -6,7 +6,10 @@ import {
 	CardTitle,
 } from "@/components/ui/card.tsx";
 import { useMcpState } from "@/context.tsx";
-import type { ReengageInput, ReengageOutput } from "../../../api/tools/reengage.ts";
+import type {
+	ReengageInput,
+	ReengageOutput,
+} from "../../../api/tools/reengage.ts";
 
 export default function ReengagePage() {
 	const state = useMcpState<ReengageInput, ReengageOutput>();

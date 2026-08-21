@@ -7,7 +7,10 @@ import {
 	CardTitle,
 } from "@/components/ui/card.tsx";
 import { useMcpApp, useMcpState } from "@/context.tsx";
-import type { ConverseInput, ConverseOutput } from "../../../api/tools/converse.ts";
+import type {
+	ConverseInput,
+	ConverseOutput,
+} from "../../../api/tools/converse.ts";
 
 function formatPrice(price: number): string {
 	return `R$ ${price.toFixed(2).replace(".", ",")}`;
@@ -66,11 +69,15 @@ export default function ConversePage() {
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<span className="text-lg">💬 Converse</span>
-							<Badge variant="secondary">sessão {result.session_id.slice(0, 8)}</Badge>
+							<Badge variant="secondary">
+								sessão {result.session_id.slice(0, 8)}
+							</Badge>
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						<p className="text-sm text-muted-foreground">{result.explanation}</p>
+						<p className="text-sm text-muted-foreground">
+							{result.explanation}
+						</p>
 						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 							{result.products.map((p) => (
 								<div

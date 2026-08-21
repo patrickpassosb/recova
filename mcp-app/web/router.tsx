@@ -7,12 +7,12 @@ import {
 	RouterProvider,
 } from "@tanstack/react-router";
 import { useMcpHostContext, useMcpState } from "./context.tsx";
-import HelloPage from "./tools/hello/index.tsx";
-import SearchRecoveryPage from "./tools/search-recovery/index.tsx";
-import ConversePage from "./tools/converse/index.tsx";
-import ReengagePage from "./tools/reengage/index.tsx";
 import AnalyzeZeroResultsPage from "./tools/analyze-zero-results/index.tsx";
+import ConversePage from "./tools/converse/index.tsx";
 import DashboardPage from "./tools/dashboard/index.tsx";
+import HelloPage from "./tools/hello/index.tsx";
+import ReengagePage from "./tools/reengage/index.tsx";
+import SearchRecoveryPage from "./tools/search-recovery/index.tsx";
 
 const TOOL_PAGES: Record<string, React.ComponentType> = {
 	hello_world: HelloPage,

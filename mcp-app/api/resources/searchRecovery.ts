@@ -1,11 +1,9 @@
-import { createAppResource } from "./appResource.ts";
-import {
-	ANALYZE_RESOURCE_URI,
-} from "../tools/analyzeZeroResults.ts";
+import { ANALYZE_RESOURCE_URI } from "../tools/analyzeZeroResults.ts";
 import { CONVERSE_RESOURCE_URI } from "../tools/converse.ts";
+import { DASHBOARD_RESOURCE_URI } from "../tools/dashboard.ts";
 import { REENGAGE_RESOURCE_URI } from "../tools/reengage.ts";
 import { SEARCH_RECOVERY_RESOURCE_URI } from "../tools/searchRecovery.ts";
-import { DASHBOARD_RESOURCE_URI } from "../tools/dashboard.ts";
+import { createAppResource } from "./appResource.ts";
 
 export const searchRecoveryAppResource = createAppResource(
 	SEARCH_RECOVERY_RESOURCE_URI,

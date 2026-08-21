@@ -12,14 +12,7 @@ export interface Props {
 
 export default function SearchResultGrid({ products, offset = 0, prefetch = "intent" }: Props) {
   return (
-    <div
-      data-product-list
-      className={clx(
-        "grid w-full",
-        "grid-cols-2 gap-3",
-        "sm:grid-cols-3",
-      )}
-    >
+    <div data-product-list className={clx("grid w-full", "grid-cols-2 gap-3", "sm:grid-cols-3")}>
       {products.map((product, index) => (
         <ProductCard
           key={`product-card-${product.productID}`}

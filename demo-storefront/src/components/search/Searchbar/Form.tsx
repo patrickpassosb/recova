@@ -57,7 +57,8 @@ export default function Searchbar({
       // bootstrap), but @decocms/apps' ambient Window.DECO type only declares
       // `subscribe`. Cast through the real shape to dispatch programmatically.
       const events = window.DECO?.events as unknown as
-        { dispatch?: (event: unknown) => void } | undefined;
+        | { dispatch?: (event: unknown) => void }
+        | undefined;
       events?.dispatch?.({
         name: "search",
         params: { search_term: term },

@@ -116,10 +116,7 @@ const withoutPoweredBy = <T extends FetchWorker>(worker: T): T => ({
     const response = await worker.fetch(request, env, ctx);
 
     // WebSocket upgrades and bodyless responses can't be reconstructed.
-    if (
-      ("webSocket" in response && response.webSocket) ||
-      !response.headers.has("x-powered-by")
-    ) {
+    if (("webSocket" in response && response.webSocket) || !response.headers.has("x-powered-by")) {
       return response;
     }
 

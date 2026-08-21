@@ -25,7 +25,9 @@ export default function SearchRecoveryPage() {
 			<div className="flex items-center justify-center min-h-dvh p-6">
 				<div className="flex items-center gap-3 text-muted-foreground">
 					<span className="w-4 h-4 border-2 border-muted border-t-primary rounded-full animate-spin" />
-					<span className="text-sm">Conectando ao agente de recuperação...</span>
+					<span className="text-sm">
+						Conectando ao agente de recuperação...
+					</span>
 				</div>
 			</div>
 		);
@@ -69,11 +71,15 @@ export default function SearchRecoveryPage() {
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<span className="text-lg">🛒 Search Recovery</span>
-							<Badge variant="secondary">sessão {result.session_id.slice(0, 8)}</Badge>
+							<Badge variant="secondary">
+								sessão {result.session_id.slice(0, 8)}
+							</Badge>
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						<p className="text-sm text-muted-foreground">{result.explanation}</p>
+						<p className="text-sm text-muted-foreground">
+							{result.explanation}
+						</p>
 						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 							{result.products.map((p) => (
 								<div
