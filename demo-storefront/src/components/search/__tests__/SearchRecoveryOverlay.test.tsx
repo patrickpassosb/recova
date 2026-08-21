@@ -341,11 +341,7 @@ describe("SearchRecoveryOverlay", () => {
       const body = String(init?.body ?? "");
       const isReengage = body.includes("reengage");
       return new Response(
-        JSON.stringify(
-          isReengage
-            ? { message: "", attempt: 2, exhausted: true }
-            : agentResult,
-        ),
+        JSON.stringify(isReengage ? { message: "", attempt: 2, exhausted: true } : agentResult),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     }) as typeof fetch;

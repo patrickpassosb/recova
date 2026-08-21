@@ -49,15 +49,11 @@ jobs:
         working-directory: demo-storefront
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: demo-storefront/package-lock.json
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - run: npm ci
+      # bun.lock is the canonical lockfile (V1 dev flow); package-lock.json was stale and is removed
+      - run: bun install --frozen-lockfile
       - run: npm run format:check
       - run: npm run typecheck
       - run: bun test --preload ./src/test/setup.ts

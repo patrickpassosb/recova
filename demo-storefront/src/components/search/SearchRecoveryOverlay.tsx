@@ -270,7 +270,10 @@ function ProductCarousel({
                         decoding="async"
                       />
                     ) : (
-                      <div className="h-full w-full" style={{ backgroundColor: theme.colors.border }} />
+                      <div
+                        className="h-full w-full"
+                        style={{ backgroundColor: theme.colors.border }}
+                      />
                     )}
                   </div>
                 </a>
@@ -288,7 +291,10 @@ function ProductCarousel({
                       decoding="async"
                     />
                   ) : (
-                    <div className="h-full w-full" style={{ backgroundColor: theme.colors.border }} />
+                    <div
+                      className="h-full w-full"
+                      style={{ backgroundColor: theme.colors.border }}
+                    />
                   )}
                 </div>
               )}
@@ -350,14 +356,13 @@ function ProductCarousel({
         })}
         {/* Espaçador à direita: largura de meia card para que o último card
             role completamente para fora do corte do container (snap final). */}
-        <div
-          className="shrink-0"
-          aria-hidden="true"
-          style={{ width: Math.round(cardWidth / 2) }}
-        />
+        <div className="shrink-0" aria-hidden="true" style={{ width: Math.round(cardWidth / 2) }} />
       </div>
       {products.length > 1 && (
-        <div className="flex items-center justify-center gap-1.5 pt-1" aria-label="Indicador de paginação">
+        <div
+          className="flex items-center justify-center gap-1.5 pt-1"
+          aria-label="Indicador de paginação"
+        >
           {products.map((p, i) => (
             <button
               key={p.id}
@@ -377,13 +382,20 @@ function ProductCarousel({
         </div>
       )}
       {products.length > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-1" aria-label="Controles do carrossel">
+        <div
+          className="flex items-center justify-center gap-2 pt-1"
+          aria-label="Controles do carrossel"
+        >
           <button
             type="button"
             onClick={() => move(-1)}
             aria-label="Produto anterior"
             className="flex size-11 items-center justify-center rounded-full border text-lg focus-visible:ring-2 hover:opacity-80"
-            style={{ borderColor: theme.colors.border, color: theme.colors.primary, backgroundColor: theme.colors.cardBg }}
+            style={{
+              borderColor: theme.colors.border,
+              color: theme.colors.primary,
+              backgroundColor: theme.colors.cardBg,
+            }}
           >
             ‹
           </button>
@@ -392,7 +404,11 @@ function ProductCarousel({
             onClick={() => setRotationPaused((paused) => !paused)}
             aria-label={rotationPaused ? "Retomar rotação" : "Pausar rotação"}
             className="flex h-11 min-w-11 items-center justify-center rounded-full border px-3 text-xs font-semibold focus-visible:ring-2 hover:opacity-80"
-            style={{ borderColor: theme.colors.border, color: theme.colors.primary, backgroundColor: theme.colors.cardBg }}
+            style={{
+              borderColor: theme.colors.border,
+              color: theme.colors.primary,
+              backgroundColor: theme.colors.cardBg,
+            }}
           >
             {rotationPaused ? "▶" : "Ⅱ"}
           </button>
@@ -401,7 +417,11 @@ function ProductCarousel({
             onClick={() => move(1)}
             aria-label="Próximo produto"
             className="flex size-11 items-center justify-center rounded-full border text-lg focus-visible:ring-2 hover:opacity-80"
-            style={{ borderColor: theme.colors.border, color: theme.colors.primary, backgroundColor: theme.colors.cardBg }}
+            style={{
+              borderColor: theme.colors.border,
+              color: theme.colors.primary,
+              backgroundColor: theme.colors.cardBg,
+            }}
           >
             ›
           </button>
@@ -971,7 +991,13 @@ export default function SearchRecoveryOverlay({
             <div className="flex items-center gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="12" r="10" stroke={theme.colors.success} strokeWidth="2" />
-                <path d="M8 12.5l2.5 2.5L16 9.5" stroke={theme.colors.success} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M8 12.5l2.5 2.5L16 9.5"
+                  stroke={theme.colors.success}
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               <span className="font-semibold" style={{ color: theme.colors.success }}>
                 {theme.copy.buySuccessTitle}
@@ -1019,7 +1045,13 @@ export default function SearchRecoveryOverlay({
             <div className="flex items-center gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="12" r="10" stroke={theme.colors.danger} strokeWidth="2" />
-                <path d="M15 9l-6 6M9 9l6 6" stroke={theme.colors.danger} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M15 9l-6 6M9 9l6 6"
+                  stroke={theme.colors.danger}
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               <span className="font-semibold" style={{ color: theme.colors.danger }}>
                 {theme.copy.failedTitle}

@@ -217,7 +217,7 @@ export default function DashboardPage() {
 										</tr>
 									</thead>
 									<tbody>
-										{result.recent.map((e, i) => {
+										{result.recent.map((e) => {
 											const ts = new Date(String(e.timestamp));
 											const ago = Math.max(
 												0,
@@ -230,7 +230,10 @@ export default function DashboardPage() {
 														? `${Math.round(ago / 60)}min atrás`
 														: ts.toLocaleString("pt-BR");
 											return (
-												<tr key={i} className="border-b last:border-0">
+												<tr
+													key={`${e.event}:${e.timestamp}:${e.session_id ?? ""}`}
+													className="border-b last:border-0"
+												>
 													<td className="p-2">
 														<Badge variant="secondary">
 															{EVENT_LABELS[String(e.event)] ?? String(e.event)}

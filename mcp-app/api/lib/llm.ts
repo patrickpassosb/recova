@@ -29,8 +29,7 @@ const OLLAMA_MODEL = "deepseek-v4-flash:preview";
 const OPENAI_DEFAULT_URL = "https://api.openai.com/v1";
 
 function llmConfig(): { apiKey: string; url: string; model: string } {
-	const apiKey =
-		process.env.OLLAMA_API_KEY || process.env.OPENAI_API_KEY || "";
+	const apiKey = process.env.OLLAMA_API_KEY || process.env.OPENAI_API_KEY || "";
 	return {
 		apiKey,
 		url: process.env.OLLAMA_API_KEY
