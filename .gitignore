@@ -14,6 +14,7 @@ dist/
 
 # Runtime data / workflow logs
 **/data/
+catalog/data/
 .pi/workflows/
 workflows/run-logs/
 
