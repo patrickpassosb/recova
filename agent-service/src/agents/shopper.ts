@@ -87,13 +87,26 @@ export async function evaluateRecovery(
 
   if (decision.route === "CLARIFY" && llm) {
     try {
-      const prompt = await llm.generateText(
-        `Shopper query: ${input.query}\nWrite one targeted clarification question.`,
-        "refinement-prompt",
-      );
+      // Gemini free tier can stall for 20+s on transient 503s (model under
+      // high demand). The storefront callers time out around 10s, so bound
+      // the best-effort prompt-writer to 5s and keep the deterministic
+      // prompt when the model is slow or down.
+      const PROMPT_WRITER_TIMEOUT_MS = 5_000;
+      const prompt = await Promise.race([
+        llm.generateText(
+          `Shopper query: ${input.query}\nWrite one targeted clarification question.`,
+          "refinement-prompt",
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("prompt-writer timeout")),
+            PROMPT_WRITER_TIMEOUT_MS,
+          )
+        ),
+      ]);
       if (prompt.trim()) decision.refinementPrompt = prompt.trim();
     } catch {
-      // Keep the deterministic prompt on LLM failure.
+      // Keep the deterministic prompt on LLM failure or timeout.
     }
   }
 
