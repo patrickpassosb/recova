@@ -1,4 +1,5 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
+import { createRecoveryHandler } from "./routes/recovery.js";
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "content-type": "application/json" });
@@ -6,14 +7,13 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /**
- * Minimal HTTP app exposing liveness/readiness probes.
- *
- * Uses only the Node `http` module for now; the ADK/domain wiring lands in
- * later work items (W03+). `GET /healthz` reports process liveness and
+ * Minimal HTTP app exposing liveness/readiness probes plus the recovery routes
+ * (`/v1/recovery/*`). `GET /healthz` reports process liveness and
  * `GET /readyz` reports readiness to serve traffic.
  */
 export function createApp(): Server {
-  return createServer((req, res) => {
+  const recovery = createRecoveryHandler();
+  return createServer(async (req, res) => {
     const { method, url } = req;
     const path = url?.split("?")[0] ?? "/";
 
@@ -25,6 +25,11 @@ export function createApp(): Server {
     if (method === "GET" && path === "/readyz") {
       sendJson(res, 200, { status: "ready" });
       return;
+    }
+
+    if (path.startsWith("/v1/recovery/")) {
+      const handled = await recovery(req, res);
+      if (handled) return;
     }
 
     sendJson(res, 404, { error: "not found" });

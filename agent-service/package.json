@@ -11,10 +11,13 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "eval": "tsx evals/run-stub-evals.ts",
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@google/adk": "^2.0.0",
+    "@google/genai": "^2.18.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

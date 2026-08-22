@@ -1,7 +1,7 @@
 import type { ProductListingPage } from "@decocms/apps-commerce/types";
 import { BreadcrumbJsonLd, PLPJsonLd } from "@decocms/blocks/hooks";
 import { mapProductToAnalyticsItem } from "@decocms/apps-commerce/utils/productToAnalyticsItem";
-import { useEffect, useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { useOffer } from "@decocms/apps-commerce/sdk/useOffer";
 import { useRouterState } from "@tanstack/react-router";
 import { useSendEvent } from "../../sdk/useSendEvent";
@@ -10,11 +10,12 @@ import Breadcrumb from "../ui/Breadcrumb";
 import Filters from "./Filters";
 import SearchFilterDrawer from "./SearchFilterDrawer";
 import SearchPagination, { rebasePaginationHrefs } from "./SearchPagination";
-import SearchRecoveryOverlay from "./SearchRecoveryOverlay";
+import DecisionCards from "./DecisionCards";
 import SearchResultGrid from "./SearchResultGrid";
 import SearchResultGridSkeleton from "./SearchResultGridSkeleton";
 import SearchSortBar from "./SearchSortBar";
 import { invoke } from "../../runtime";
+import type { RecoveryDecision } from "../../loaders/recoveryGateway";
 
 function track(event: Record<string, unknown>): void {
   invoke.site.loaders.searchRecovery({ action: "track_event", event }).catch(() => {
@@ -93,6 +94,27 @@ function Result({
   const searchTerm = new URL(href, "http://local").searchParams.get("q");
   const isZeroResults = !isRouteLoading && products.length === 0 && Boolean(searchTerm);
 
+  const [recoveryDecision, setRecoveryDecision] = useState<RecoveryDecision | null>(null);
+
+  useEffect(() => {
+    if (!searchTerm || !isZeroResults) {
+      setRecoveryDecision(null);
+      return;
+    }
+    let cancelled = false;
+    invoke.site.loaders
+      .recoveryGateway({ query: searchTerm, nativeResultIds: [] })
+      .then((decision: RecoveryDecision | null) => {
+        if (!cancelled) setRecoveryDecision(decision);
+      })
+      .catch(() => {
+        if (!cancelled) setRecoveryDecision(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchTerm, isZeroResults]);
+
   useEffect(() => {
     if (!searchTerm) return;
     track({ event: "search_performed", query_hash: hashQuery(searchTerm) });
@@ -129,8 +151,8 @@ function Result({
           isZeroResults ? "pt-20 sm:pt-24" : "pt-4 sm:pt-6"
         }`}
       >
-        {isZeroResults && searchTerm && (
-          <SearchRecoveryOverlay term={searchTerm} variant="inline" carouselLayout="wide" />
+        {isZeroResults && searchTerm && recoveryDecision && (
+          <DecisionCards decision={recoveryDecision} query={searchTerm} />
         )}
         {/* SEO: schema.org JSON-LD, server-rendered inline (crawlers read it anywhere in the document) */}
         <PLPJsonLd page={page} />
