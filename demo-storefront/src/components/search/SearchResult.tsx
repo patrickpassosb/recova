@@ -103,7 +103,12 @@ function Result({
     }
     let cancelled = false;
     invoke.site.loaders
-      .recoveryGateway({ query: searchTerm, nativeResultIds: [] })
+      .recoveryGateway({
+        query: searchTerm,
+        nativeResultIds: products
+          .map((p) => ("productID" in p && String(p.productID)) || "")
+          .filter((id) => id.length > 0),
+      })
       .then((decision: RecoveryDecision | null) => {
         if (!cancelled) setRecoveryDecision(decision);
       })

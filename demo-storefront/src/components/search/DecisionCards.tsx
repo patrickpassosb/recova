@@ -62,6 +62,73 @@ export interface DecisionCardsProps {
 export default function DecisionCards({ decision, query }: DecisionCardsProps) {
   const addToCart = useAddToCart();
 
+  const refineWith = (extra: string) => {
+    const next = `${query} ${extra}`.trim();
+    window.location.assign(`/s?q=${encodeURIComponent(next)}`);
+  };
+
+  // CLARIFY: the domain refused to guess (no valid candidate). Show the
+  // targeted question + refinement options instead of a dead zero-results
+  // page. Chips re-run the search with the chosen option appended.
+  if (decision.cards.length === 0 && decision.route === "CLARIFY") {
+    return (
+      <section
+        aria-live="polite"
+        aria-label="Search clarification"
+        className="flex w-full flex-col gap-3 rounded-lg border p-4"
+        style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.cardBg }}
+      >
+        <p className="text-sm font-medium" style={{ color: theme.colors.text }}>
+          No exact match for &ldquo;{query}&rdquo;
+        </p>
+        <p className="text-sm" style={{ color: theme.colors.muted }}>
+          {decision.refinementPrompt ?? "Tell me a bit more about what you are looking for."}
+        </p>
+        {decision.refinementOptions.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {decision.refinementOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => refineWith(option)}
+                className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
+                style={{ borderColor: theme.colors.primary, color: theme.colors.primary }}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const input = event.currentTarget.elements.namedItem(
+              "clarify",
+            ) as HTMLInputElement | null;
+            if (input?.value.trim()) refineWith(input.value.trim());
+          }}
+        >
+          <input
+            name="clarify"
+            type="text"
+            placeholder="e.g. under $50, size M…"
+            aria-label="Refine your search"
+            className="grow rounded-md border px-3 py-2 text-sm outline-none"
+            style={{ borderColor: theme.colors.border, color: theme.colors.text }}
+          />
+          <button
+            type="submit"
+            className="rounded-md px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: theme.colors.primary }}
+          >
+            Refine
+          </button>
+        </form>
+      </section>
+    );
+  }
+
   if (decision.route !== "RECOVER" || decision.cards.length === 0) {
     return null;
   }

@@ -103,8 +103,15 @@ describe("DecisionCards", () => {
     expect(availableBuyNow.disabled).toBe(false);
   });
 
-  it("renders nothing for a CLARIFY decision", () => {
-    const { container } = renderCards(makeDecision([], "CLARIFY"));
+  it("renders the clarification panel for a CLARIFY decision", () => {
+    renderCards(makeDecision([], "CLARIFY"));
+    expect(screen.getByRole("region", { name: "Search clarification" })).toBeTruthy();
+    expect(screen.getByText("Tell me a bit more about what you are looking for.")).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Refine your search" })).toBeTruthy();
+  });
+
+  it("still renders nothing for an empty NATIVE_OK decision", () => {
+    const { container } = renderCards(makeDecision([], "NATIVE_OK"));
     expect(container.firstChild).toBeNull();
   });
 

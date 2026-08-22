@@ -136,6 +136,10 @@
           "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3Byb2R1Y3RCeUhhbmRsZS50cw==",
           "namespace": "site"
         },
+        "site/loaders/recoveryGateway.ts": {
+          "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3JlY292ZXJ5R2F0ZXdheS50cw==",
+          "namespace": "site"
+        },
         "site/loaders/searchRecovery.ts": {
           "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3NlYXJjaFJlY292ZXJ5LnRz",
           "namespace": "site"
@@ -276,6 +280,37 @@
             "type": "string",
             "title": "Product handle",
             "description": "The product's URL handle/slug (e.g. \"high-top-canvas-shoes\") — pins an exact product instead of relying on a search query."
+          }
+        }
+      },
+      "c2l0ZS9sb2FkZXJzL3JlY292ZXJ5R2F0ZXdheS50cw==": {
+        "title": "site/loaders/recoveryGateway.ts",
+        "type": "object",
+        "required": [
+          "__resolveType",
+          "query"
+        ],
+        "properties": {
+          "__resolveType": {
+            "type": "string",
+            "enum": [
+              "site/loaders/recoveryGateway.ts"
+            ],
+            "default": "site/loaders/recoveryGateway.ts"
+          },
+          "query": {
+            "type": "string",
+            "description": "Shopper query that failed native search.",
+            "title": "Query"
+          },
+          "nativeResultIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "description": "Native result IDs (empty when native search returned zero results).",
+            "title": "NativeResultIds"
           }
         }
       },
@@ -5747,6 +5782,9 @@
           },
           {
             "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3Byb2R1Y3RCeUhhbmRsZS50cw=="
+          },
+          {
+            "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3JlY292ZXJ5R2F0ZXdheS50cw=="
           },
           {
             "$ref": "#/definitions/c2l0ZS9sb2FkZXJzL3NlYXJjaFJlY292ZXJ5LnRz"
