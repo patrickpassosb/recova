@@ -3,140 +3,132 @@ import searchRecoveryLoader from "../searchRecovery.ts";
 
 /**
  * Integration tests for the storefront's searchRecovery loader — the
- * server-side proxy that talks to the MCP agent over HTTP/SSE.
+ * server-side proxy that talks to the agent-service V2 recovery gateway
+ * (`/v1/recovery/evaluate` and `/v1/recovery/refine`).
  *
- * We stub `globalThis.fetch` to return MCP-style SSE payloads, exercising the
- * real SSE parsing, `structuredContent`/text fallback, and action routing in
- * `callTool`.
+ * We stub `globalThis.fetch` to return V2 RecoveryDecision payloads,
+ * exercising the real HTTP calls, boundary guards, action routing, and the
+ * RecoveryDecision → RecoveryResult mapping consumed by SearchRecoveryOverlay.
  */
-describe("searchRecoveryLoader", () => {
+
+function v2Decision(overrides: Record<string, unknown> = {}) {
+  return {
+    sessionId: "sess-1",
+    route: "RECOVER",
+    strategy: "QUERY_REPAIR",
+    activationReasons: ["native search returned zero results"],
+    constraints: [],
+    cards: [
+      {
+        productId: "gid://shopify/Product/1",
+        variantId: "gid://shopify/ProductVariant/11",
+        handle: "high-top-canvas-shoes",
+        title: "High Top Canvas Shoes",
+        imageUrl: null,
+        price: 120,
+        available: true,
+        selectedOptions: [],
+        matchScore: 0.8,
+        satisfied: [],
+        relaxedSoft: [],
+        unknown: [],
+        reason: "matches query",
+        rank: 1,
+      },
+    ],
+    rejectedCandidates: [],
+    refinementPrompt: "Qual faixa de preço?",
+    refinementOptions: ["Casual", "Esportivo"],
+    ...overrides,
+  };
+}
+
+describe("searchRecoveryLoader (V2 gateway)", () => {
   const originalFetch = globalThis.fetch;
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });
 
-  /** Returns an MCP SSE body containing a structuredContent result. */
-  function sseResult(structured: unknown): Response {
-    const text = `event: message\ndata: ${JSON.stringify({
-      jsonrpc: "2.0",
-      id: "1",
-      result: {
-        structuredContent: structured,
-        content: [{ type: "text", text: JSON.stringify(structured) }],
-      },
-    })}\n\n`;
-    return new Response(text, {
-      status: 200,
-      headers: { "Content-Type": "text/event-stream" },
-    });
+  function stubFetch(status: number, body: unknown) {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
   }
 
-  const recoveryResult = {
-    session_id: "sess-1",
-    products: [
-      {
-        id: "gid://1",
-        title: "High Top Canvas Shoes",
-        price: 120,
-        image: null,
-        score: 0.8,
-        match_type: "MATCH",
-        variant_id: "var-1",
-      },
-    ],
-    explanation: "Encontrei tênis para você.",
-    follow_up_question: "Gosta?",
-    refinement_options: ["Casual", "Esportivo"],
-  };
-
-  it("search_recovery returns the structured result", async () => {
-    globalThis.fetch = (async () => sseResult(recoveryResult)) as typeof fetch;
-    const res = await searchRecoveryLoader({ query: "tenis" });
-    expect(res).toMatchObject({ session_id: "sess-1" });
-    expect((res as typeof recoveryResult).products.length).toBeGreaterThan(0);
+  it("search_recovery maps RECOVER decision to RecoveryResult products", async () => {
+    stubFetch(200, v2Decision());
+    const result = await searchRecoveryLoader({ query: "tenis", action: "search_recovery" });
+    expect(result).not.toBeNull();
+    if (result && "products" in result) {
+      expect(result.session_id).toBe("sess-1");
+      expect(result.products.length).toBe(1);
+      expect(result.products[0].title).toBe("High Top Canvas Shoes");
+      expect(result.products[0].variant_id).toBe("gid://shopify/ProductVariant/11");
+      expect(result.products[0].match_type).toBe("MATCH");
+      expect(result.refinement_options).toEqual(["Casual", "Esportivo"]);
+    }
   });
 
-  it("returns null early for search_recovery without a query", async () => {
-    const res = await searchRecoveryLoader({});
-    expect(res).toBeNull();
+  it("search_recovery maps CLARIFY to prompt + chips with no products", async () => {
+    stubFetch(200, v2Decision({ route: "CLARIFY", cards: [] }));
+    const result = await searchRecoveryLoader({ query: "zeeker", action: "search_recovery" });
+    expect(result).not.toBeNull();
+    if (result && "products" in result) {
+      expect(result.products.length).toBe(0);
+      expect(result.explanation).toContain("preço");
+      expect(result.refinement_options).toEqual(["Casual", "Esportivo"]);
+    }
   });
 
-  it("routes converse action with session + response", async () => {
-    globalThis.fetch = (async () => sseResult(recoveryResult)) as typeof fetch;
-    const res = await searchRecoveryLoader({
-      action: "converse",
-      session_id: "sess-1",
-      user_response: "quero casual",
-    });
-    expect(res).toMatchObject({ session_id: "sess-1" });
+  it("search_recovery returns null on NATIVE_OK and on non-200", async () => {
+    stubFetch(200, v2Decision({ route: "NATIVE_OK" }));
+    expect(await searchRecoveryLoader({ query: "hoodie", action: "search_recovery" })).toBeNull();
+
+    stubFetch(500, { error: "boom" });
+    expect(await searchRecoveryLoader({ query: "hoodie", action: "search_recovery" })).toBeNull();
   });
 
-  it("returns null for converse without session or response", async () => {
-    const res = await searchRecoveryLoader({ action: "converse", session_id: "sess-1" });
-    expect(res).toBeNull();
-  });
-
-  it("routes reengage action", async () => {
-    globalThis.fetch = (async () =>
-      sseResult({ message: "Ei!", attempt: 1, exhausted: false })) as typeof fetch;
-    const res = await searchRecoveryLoader({
-      action: "reengage",
-      session_id: "sess-1",
-    });
-    expect(res).toMatchObject({ attempt: 1, exhausted: false });
-  });
-
-  it("routes analyze action", async () => {
-    globalThis.fetch = (async () =>
-      sseResult({
-        report: [{ term: "bicicleta", volume: 10, cause: "nao_catalogado", suggested_fix: "x" }],
-        summary: "Resumo",
-      })) as typeof fetch;
-    const res = await searchRecoveryLoader({ action: "analyze" });
-    expect(res).toMatchObject({ report: [{ term: "bicicleta" }] });
-  });
-
-  it("falls back to parsing JSON from the text content block", async () => {
-    // SSE with no structuredContent but a JSON text block
-    const text = `data: ${JSON.stringify({
-      jsonrpc: "2.0",
-      id: "1",
-      result: { content: [{ type: "text", text: JSON.stringify(recoveryResult) }] },
-    })}\n\n`;
-    globalThis.fetch = (async () =>
-      new Response(text, {
+  it("converse calls /refine with the session id", async () => {
+    let capturedUrl = "";
+    let capturedBody: Record<string, unknown> = {};
+    globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+      capturedUrl = String(input);
+      capturedBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify(v2Decision()), {
         status: 200,
-        headers: { "Content-Type": "text/event-stream" },
-      })) as typeof fetch;
-    const res = await searchRecoveryLoader({ query: "tenis" });
-    expect(res).toMatchObject({ session_id: "sess-1" });
-  });
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
 
-  it("returns null and swallows errors when the MCP server is down", async () => {
-    globalThis.fetch = (async () => new Response("down", { status: 503 })) as typeof fetch;
-    const res = await searchRecoveryLoader({ query: "tenis" });
-    expect(res).toBeNull();
-  });
-
-  it("throws an error surfaced from the MCP error payload", async () => {
-    // The loader catches fetch-level errors, but an MCP error payload is a
-    // successful HTTP response; callTool throws, loader returns null.
-    const text = `data: ${JSON.stringify({
-      jsonrpc: "2.0",
-      id: "1",
-      error: { message: "Sessão expirada" },
-    })}\n\n`;
-    globalThis.fetch = (async () =>
-      new Response(text, {
-        status: 200,
-        headers: { "Content-Type": "text/event-stream" },
-      })) as typeof fetch;
-    const res = await searchRecoveryLoader({
+    const result = await searchRecoveryLoader({
+      session_id: "sess-1",
+      user_response: "só preto",
       action: "converse",
-      session_id: "x",
-      user_response: "oi",
     });
-    expect(res).toBeNull();
+    expect(capturedUrl).toContain("/v1/recovery/refine");
+    expect(capturedBody).toEqual({ sessionId: "sess-1", userResponse: "só preto" });
+    expect(result).not.toBeNull();
+  });
+
+  it("converse requires session_id and user_response", async () => {
+    expect(await searchRecoveryLoader({ action: "converse" })).toBeNull();
+  });
+
+  it("unsupported V2 actions are no-ops (null)", async () => {
+    for (const action of ["reengage", "analyze", "dashboard", "track_event"] as const) {
+      expect(
+        await searchRecoveryLoader({ action, session_id: "s", event: { event: "x" } }),
+      ).toBeNull();
+    }
+  });
+
+  it("returns null when fetch throws", async () => {
+    globalThis.fetch = (async () => {
+      throw new Error("network down");
+    }) as typeof fetch;
+    expect(await searchRecoveryLoader({ query: "x", action: "search_recovery" })).toBeNull();
   });
 });

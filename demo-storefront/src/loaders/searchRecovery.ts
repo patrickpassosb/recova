@@ -1,12 +1,16 @@
 /**
- * Loader proxy do Search Recovery Agent.
+ * Loader do Search Recovery Agent (V2).
  *
- * Roda server-side (no dev server / worker) e faz proxy para o MCP server
- * do agente (`http://localhost:3001/api/mcp` na VPS). O browser não acessa
- * o MCP diretamente — chama este loader via `invoke.site.loaders.searchRecovery`.
+ * Roda server-side e faz proxy para o agent-service V2
+ * (`{AGENT_URL}/v1/recovery/evaluate` e `/v1/recovery/refine`), o mesmo
+ * backend do `recoveryGateway` usado pela página `/s`. O browser não acessa
+ * o agente diretamente — chama este loader via `invoke.site.loaders.searchRecovery`.
  *
- * Expõe as 4 tools do agente: search_recovery, converse, reengage e
- * analyze_zero_results.
+ * Mapeia o `RecoveryDecision` do V2 para o shape histórico `RecoveryResult`
+ * consumido pelo `SearchRecoveryOverlay` (modal de busca).
+ *
+ * Sem equivalente V2 (retornam null, tratados como no-op pelo overlay):
+ * `reengage`, `analyze`, `dashboard`, `track_event`.
  */
 
 export interface RecoveryProduct {
@@ -61,53 +65,106 @@ export interface TrackEventResult {
   timestamp: string;
 }
 
-const MCP_URL = "http://localhost:3001/api/mcp";
+// ---------------------------------------------------------------------------
+// V2 agent client
+// ---------------------------------------------------------------------------
 
-async function callTool<T>(name: string, arguments_: Record<string, unknown>): Promise<T> {
-  const res = await fetch(MCP_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: crypto.randomUUID(),
-      method: "tools/call",
-      params: { name, arguments: arguments_ },
-    }),
-    signal: AbortSignal.timeout(10_000),
-  });
+const DEFAULT_AGENT_URL = "http://localhost:8080";
+const REQUEST_TIMEOUT_MS = 10_000;
 
-  if (!res.ok) {
-    throw new Error(`MCP server respondeu HTTP ${res.status}`);
+interface DecisionCardDto {
+  productId: string;
+  variantId: string;
+  handle: string;
+  title: string;
+  imageUrl: string | null;
+  price: number;
+  available: boolean;
+  matchScore: number;
+  reason: string;
+}
+
+interface RecoveryDecisionDto {
+  sessionId: string;
+  route: "NATIVE_OK" | "RECOVER" | "CLARIFY";
+  cards: DecisionCardDto[];
+  refinementPrompt: string | null;
+  refinementOptions: string[];
+}
+
+/** Resolve the agent base URL from `AGENT_URL`, defaulting to localhost. */
+function agentUrl(): string {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+    ?.env;
+  return env?.AGENT_URL?.trim() || DEFAULT_AGENT_URL;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Minimal boundary guard: only trust fields we actually read. */
+function parseDecision(value: unknown): RecoveryDecisionDto | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.sessionId !== "string") return null;
+  if (value.route !== "NATIVE_OK" && value.route !== "RECOVER" && value.route !== "CLARIFY") {
+    return null;
   }
+  if (!Array.isArray(value.cards)) return null;
+  if (value.refinementPrompt !== null && typeof value.refinementPrompt !== "string") return null;
+  if (!Array.isArray(value.refinementOptions)) return null;
+  return value as unknown as RecoveryDecisionDto;
+}
 
-  const text = await res.text();
-  // Resposta SSE: linhas "data: {json}"
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("data: ")) continue;
-    const payload = JSON.parse(trimmed.slice(6)) as {
-      result?: { structuredContent?: T; content?: Array<{ type: string; text?: string }> };
-      error?: { message?: string };
+/** Mapeia o RecoveryDecision do V2 para o shape consumido pelo overlay. */
+function toRecoveryResult(decision: RecoveryDecisionDto): RecoveryResult | null {
+  if (decision.route === "NATIVE_OK") return null;
+
+  const products: RecoveryProduct[] = decision.cards.map((card) => ({
+    id: card.productId,
+    title: card.title,
+    handle: card.handle ?? null,
+    description: null,
+    price: card.price,
+    image: card.imageUrl ?? null,
+    score: card.matchScore,
+    match_type: "MATCH",
+    variant_id: card.variantId,
+  }));
+
+  if (decision.route === "CLARIFY") {
+    return {
+      session_id: decision.sessionId,
+      products: [],
+      explanation: decision.refinementPrompt ??
+        "Não consegui identificar exatamente o que você procura. Pode me dar mais detalhes?",
+      follow_up_question: "",
+      refinement_options: decision.refinementOptions,
     };
-    if (payload.error) {
-      throw new Error(payload.error.message ?? "Erro no MCP server");
-    }
-    const structured = payload.result?.structuredContent;
-    if (structured) return structured;
-    // fallback: parseia o texto JSON do content
-    const textBlock = payload.result?.content?.find((c) => c.type === "text");
-    if (textBlock?.text) {
-      try {
-        return JSON.parse(textBlock.text) as T;
-      } catch {
-        // não é JSON — segue
-      }
-    }
   }
-  throw new Error("MCP server não retornou resultado");
+
+  // RECOVER
+  return {
+    session_id: decision.sessionId,
+    products,
+    explanation: "Separei algumas opções do catálogo que podem atender ao que você procura.",
+    follow_up_question: "Quer que eu refine por preço, tamanho ou estilo?",
+    refinement_options: decision.refinementOptions,
+  };
+}
+
+async function postDecision(
+  path: "/v1/recovery/evaluate" | "/v1/recovery/refine",
+  body: Record<string, unknown>,
+): Promise<RecoveryDecisionDto | null> {
+  const res = await fetch(`${agentUrl()}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!res.ok) return null;
+  return parseDecision(await res.json());
 }
 
 export interface Props {
@@ -128,7 +185,6 @@ export default async function searchRecoveryLoader({
   session_id,
   user_response,
   action = "search_recovery",
-  event,
 }: Props): Promise<
   RecoveryResult | ReengageResult | AnalyzeResult | DashboardResult | TrackEventResult | null
 > {
@@ -136,25 +192,30 @@ export default async function searchRecoveryLoader({
 
   try {
     switch (action) {
-      case "converse":
+      case "converse": {
         if (!session_id || !user_response) return null;
-        return await callTool<RecoveryResult>("converse", {
-          session_id,
-          user_response,
+        const decision = await postDecision("/v1/recovery/refine", {
+          sessionId: session_id,
+          userResponse: user_response,
         });
+        return decision ? toRecoveryResult(decision) : null;
+      }
+      case "search_recovery": {
+        const decision = await postDecision("/v1/recovery/evaluate", {
+          storeId: "demo",
+          query,
+          nativeResultIds: [],
+        });
+        return decision ? toRecoveryResult(decision) : null;
+      }
+      // Sem equivalente no agent-service V2 — no-op (o overlay trata null
+      // como "sem resultado" sem quebrar o fluxo).
       case "reengage":
-        if (!session_id) return null;
-        return await callTool<ReengageResult>("reengage", { session_id });
       case "analyze":
-        return await callTool<AnalyzeResult>("analyze_zero_results", {});
       case "dashboard":
-        return await callTool<DashboardResult>("dashboard", {});
       case "track_event":
-        if (!event) return null;
-        return await callTool<TrackEventResult>("track_event", event);
-      case "search_recovery":
       default:
-        return await callTool<RecoveryResult>("search_recovery", { query });
+        return null;
     }
   } catch (err) {
     console.error("[searchRecoveryLoader]", err);
