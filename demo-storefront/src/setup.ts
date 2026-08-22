@@ -162,6 +162,12 @@ registerInvokeHandlers({
     (await import("./loaders/searchRecovery")).default(props as any),
   "site/loaders/searchRecovery": async (props) =>
     (await import("./loaders/searchRecovery")).default(props as any),
+  // V2 Decision Cards gateway — POST /deco/invoke/site/loaders/recoveryGateway
+  // from the SearchResult zero-results path (DecisionCards.tsx).
+  "site/loaders/recoveryGateway.ts": async (props) =>
+    (await import("./loaders/recoveryGateway")).default(props as any),
+  "site/loaders/recoveryGateway": async (props) =>
+    (await import("./loaders/recoveryGateway")).default(props as any),
   "site/actions/wishlist/submit.ts": async (props, req) =>
     (await import("./actions/wishlist/submit")).default(props, req),
   "site/actions/wishlist/submit": async (props, req) =>
