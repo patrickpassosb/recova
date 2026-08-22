@@ -58,9 +58,18 @@ No token budgets — free spend with full accounting. Structural bounds only: `m
 - **Lesson 3:** first-pass fail rate 60% across 2 days — reviewers with write-revert-revert failing-test power catch semantic bugs compile-test loops miss. Keep.
 - **Lesson 4:** implementer reports can be lost on timeout while their writes persist; orchestrator must verify disk state as the source of truth before recording failure.
 
+### D3 — recova-v2-day3-vertical-slice (2026-08-22) — PROTECTED BASELINE LANDED
+
+- **Scope:** W05 ADK+Gemini agent/routes/config/evals, W09 storefront Decision Cards, service-level Day-3 gate.
+- **Agents:** 6/6 complete, 0 errors. **Tokens:** 12.36M (largest day; medium implementers at 60-min budgets).
+- **Reviews:** W05 PASS first try (compliance: real ADK instantiation, stub network isolation probed and reverted, no key leakage). W09 FAIL→fixed: gateway accepted unvalidated JSON (high), stale decisions between queries, color-claim leak through selectedOptions (all fixed + regression tests).
+- **D3-GATE: PASS with evidence in docs/DAY3_E2E.md** — zero-results query -> RECOVER (QUERY_REPAIR, 1 card, hard size M) -> refine `under $250` -> 2 cards honoring price+size -> cart -> checkout URL; every ID verified against fixture.
+- **Lesson 5:** the fix prompt must state the max-3/card-contract fields precisely; UX review caught semantic drift between card contract and component copy (color badges). Copy rules now encoded in DecisionCards tests.
+
 ## Daily spend
 
 | Day | Workflow tokens | Cost | Notes |
 |---|---|---|---|
 | D1 (2026-08-20) | 1.6M | $0.99 | 9 agents, W00/W02/W03 complete |
-| D2-a (2026-08-21) | 0.6M | ~$0.40 est | CI fixes: stale lockfiles, gitignored codegen, V1 test-hardening |
+| D2 (2026-08-21) | 6.5M | ~$2.50 est | W04 domain + W06 catalog/adapters, 9 agents, 3x fail-then-fix reviews |
+| D3 (2026-08-22) | 12.4M | ~$5 est | W05 ADK agent pass-first-review, W09 UX fail-then-fix, D3 gate PASS |
