@@ -17,7 +17,7 @@ import { lexicalSearch } from "./stress-test-catalog.js";
  * and never hardcoded. The adapter maps Storefront API products/variants into
  * the shared `CatalogProduct` / `CatalogVariant` shapes (with `selectedOptions`
  * parsed into `options`), and implements `CommerceAdapter` via the Storefront
- * `cartCreate` / `checkoutCreate` mutations.
+ * `cartCreate` mutation (whose cart carries the hosted `checkoutUrl`).
  *
  * This is a separate adapter path, not the system of record for the 10k
  * stress-test catalog.
@@ -62,16 +62,11 @@ const CART_CREATE_QUERY = `mutation cartCreate($input: CartInput!) {
   cartCreate(input: $input) {
     cart {
       id
+      checkoutUrl
       lines(first: 10) {
         edges { node { id quantity merchandise { ... on ProductVariant { id } } } }
       }
     }
-  }
-}`;
-
-const CHECKOUT_CREATE_QUERY = `mutation checkoutCreate($input: CheckoutCreateInput!) {
-  checkoutCreate(input: $input) {
-    checkout { webUrl }
   }
 }`;
 
@@ -144,6 +139,7 @@ export class ShopifyAdapter implements CatalogAdapter, CommerceAdapter {
   private products: CatalogProduct[] | null = null;
   private byId: Map<string, CatalogProduct> | null = null;
   private readonly carts = new Map<string, CartResult>();
+  private readonly checkoutUrls = new Map<string, string>();
   private readonly config: ShopifyConfig;
 
   constructor(config: ShopifyConfig) {
@@ -258,24 +254,18 @@ export class ShopifyAdapter implements CatalogAdapter, CommerceAdapter {
 
     const result: CartResult = { cartId, lines };
     this.carts.set(cartId, result);
+    if (typeof cart.checkoutUrl === "string" && cart.checkoutUrl) {
+      this.checkoutUrls.set(cartId, cart.checkoutUrl);
+    }
     return result;
   }
 
   async getCheckoutUrl(cartId: string): Promise<string> {
-    const cart = this.carts.get(cartId);
-    if (!cart) throw new Error(`cart ${cartId} not found`);
-
-    const json = await this.gql(CHECKOUT_CREATE_QUERY, {
-      input: {
-        lineItems: cart.lines.map((l) => ({
-          variantId: l.variantId,
-          quantity: l.quantity,
-        })),
-      },
-    });
-    const data = asRecord(json.data);
-    const checkoutCreate = asRecord(data.checkoutCreate);
-    const checkout = asRecord(checkoutCreate.checkout);
-    return String(checkout.webUrl ?? "");
+    if (!this.carts.has(cartId)) throw new Error(`cart ${cartId} not found`);
+    // `checkoutCreate` was removed from the Storefront API; the cart itself
+    // carries the hosted checkout URL (`*.myshopify.com/checkouts/...`).
+    const url = this.checkoutUrls.get(cartId);
+    if (!url) throw new Error(`cart ${cartId} has no checkout URL`);
+    return url;
   }
 }

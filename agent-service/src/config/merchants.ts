@@ -1,4 +1,5 @@
 import type { CatalogAdapter, CommerceAdapter } from "../adapters/interfaces.js";
+import { ShopifyAdapter } from "../adapters/shopify.js";
 import { StressTestCatalogAdapter } from "../adapters/stress-test-catalog.js";
 import {
   MerchantConfigSchema,
@@ -57,14 +58,50 @@ function baseConfig(
   });
 }
 
-/** The single active demo merchant, backed by the stress-test catalog. */
-const demoAdapter = new StressTestCatalogAdapter();
+/**
+ * The `demo` merchant is backed by the real Shopify demo store when the
+ * `SHOPIFY_STOREFRONT_ENDPOINT` + `SHOPIFY_STOREFRONT_TOKEN` envs are set —
+ * this makes variant IDs real Shopify GIDs, so cart/checkout actually work.
+ * Without the envs it falls back to the stress-test catalog (search-only;
+ * variant IDs are synthetic and Shopify rejects them at cart time).
+ * `demo-stress` always binds the stress-test catalog.
+ */
+function buildDemoRuntime(): MerchantRuntime {
+  const endpoint = process.env.SHOPIFY_STOREFRONT_ENDPOINT;
+  const token = process.env.SHOPIFY_STOREFRONT_TOKEN;
+  if (endpoint && token) {
+    const shopify = new ShopifyAdapter({
+      endpoint,
+      storefrontAccessToken: token,
+    });
+    console.log("[merchants] demo merchant backed by Shopify Storefront API");
+    return {
+      config: baseConfig("demo", "shopify"),
+      catalogAdapter: shopify,
+      commerceAdapter: shopify,
+      active: true,
+    };
+  }
+  console.warn(
+    "[merchants] SHOPIFY_STOREFRONT_ENDPOINT/TOKEN not set; demo merchant backed by stress-test catalog (cart/checkout disabled)",
+  );
+  const stress = new StressTestCatalogAdapter();
+  return {
+    config: baseConfig("demo", "stress-test"),
+    catalogAdapter: stress,
+    commerceAdapter: stress,
+    active: true,
+  };
+}
+
+const stressAdapter = new StressTestCatalogAdapter();
 
 const REGISTRY: Record<string, MerchantRuntime> = {
-  demo: {
-    config: baseConfig("demo", "stress-test"),
-    catalogAdapter: demoAdapter,
-    commerceAdapter: demoAdapter,
+  demo: buildDemoRuntime(),
+  "demo-stress": {
+    config: baseConfig("demo-stress", "stress-test"),
+    catalogAdapter: stressAdapter,
+    commerceAdapter: stressAdapter,
     active: true,
   },
   // Deactivated: the Shopify adapter requires credentials that are not

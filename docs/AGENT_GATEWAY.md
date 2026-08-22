@@ -130,8 +130,15 @@ Unknown `storeId` → `404` (no fallback merchant). Deactivated merchant →
 
 Server-controlled registry (`src/config/merchants.ts`):
 
-- `demo` — stress-test catalog adapter (active).
-- `demo-shopify` — Shopify adapter shape (deactivated; no credentials).
+- `demo` — Shopify Storefront adapter when `SHOPIFY_STOREFRONT_ENDPOINT` +
+  `SHOPIFY_STOREFRONT_TOKEN` are set (real catalog, real cart, real checkout
+  URL); falls back to the stress-test catalog (search-only) otherwise.
+- `demo-stress` — stress-test catalog adapter (always active).
+- `demo-shopify` — Shopify adapter shape (deactivated; `demo` covers the
+  Shopify path).
+
+Checkout note: the Storefront API removed `checkoutCreate`; the real checkout
+URL comes from the `checkoutUrl` field on the cart returned by `cartCreate`.
 
 Client input never selects arbitrary stores or secret-bearing connector
 configuration.
